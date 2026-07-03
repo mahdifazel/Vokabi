@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vokabi — German Vocabulary Trainer
 
-## Getting Started
+A mobile-first PWA for learning German vocabulary: native pronunciation, speaking practice, word groups, and listening playlists. All data lives on-device (IndexedDB) and the app works offline.
 
-First, run the development server:
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # development at http://localhost:3000
+npm run build && npm start   # production (service worker enabled)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+For the full PWA experience, open it in Chrome on Android and "Add to Home Screen".
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Add words in bulk** — paste one word or a whole list; articles like "das Haus" are detected
+- **Automatic dictionary** — article (der/die/das), English translation, plural, IPA, and part of speech via a built-in offline seed dictionary (~300 A1/A2 words), Wiktionary, and a translation fallback; results are cached in IndexedDB
+- **Native pronunciation** — best available German system voice (Google natural voices on Android), selectable in Settings
+- **Pronunciation practice** — speak the word, get Excellent / Good / Needs improvement feedback with per-letter mistake highlighting (Web Speech API)
+- **Groups** — create/rename/delete groups, words can belong to several
+- **Playlists** — play a whole group with configurable speed (0.5–1.5×), pause between words (0–5 s), repeat count (1–5×), read article, read translation, shuffle, and endless auto-repeat; mini-player with prev/pause/next
+- **Favorites** — heart any word; favorites act as their own group
+- **Search** — instant search across German, English, plural, and article
+- **Word details** — plural, IPA, example sentence, notes, group membership, slow playback, edit everything
+- **Import/Export** — import TXT/CSV (with or without translations), export CSV/JSON
+- **Dark/light/system theme**, offline-first service worker, installable PWA
 
-## Learn More
+## Stack
 
-To learn more about Next.js, take a look at the following resources:
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · Framer Motion · Dexie (IndexedDB) · Web Speech API (TTS + recognition) · lucide-react
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Architecture notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `src/lib/db.ts` — Dexie schema: `words`, `groups`, `dictCache`
+- `src/lib/dictionary.ts` — lookup pipeline: seed → cache → en.wiktionary (gender/plural/IPA/definitions parsed from wikitext) → MyMemory translation fallback
+- `src/lib/player.ts` — playback engine driven by user settings; cancellation via generation counter
+- `src/lib/speech.ts` — SpeechRecognition scoring (Levenshtein + LCS char diff)
+- TTS is pluggable: swap `src/lib/tts.ts` for Azure/Google Cloud TTS later; cloud sync can hook into the Dexie tables

@@ -1,65 +1,105 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useMemo, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import { BookOpen, Play, Plus, Search, X } from "lucide-react";
+import { db } from "@/lib/db";
+import { matchesQuery } from "@/lib/words";
+import { startPlaylist } from "@/lib/player";
+import { WordRow } from "@/components/word-row";
+import { AddWordsSheet } from "@/components/add-words-sheet";
+import { Button, EmptyState, Input } from "@/components/ui";
+
+export default function WordsPage() {
+  const [query, setQuery] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+
+  const words = useLiveQuery(
+    () => db.words.orderBy("createdAt").reverse().toArray(),
+    []
+  );
+
+  const filtered = useMemo(
+    () => (words ?? []).filter((w) => matchesQuery(w, query)),
+    [words, query]
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="px-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <header className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight">Vokabi</h1>
+          <p className="text-sm font-semibold text-muted">
+            {words ? `${words.length} word${words.length === 1 ? "" : "s"}` : "…"}
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        {filtered.length > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => startPlaylist(filtered, query ? "Search results" : "All words")}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <Play size={16} /> Play all
+          </Button>
+        )}
+      </header>
+
+      <div className="relative mb-4">
+        <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-muted" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search German, English or article…"
+          className="pl-11 pr-10"
+          type="search"
+          aria-label="Search words"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            aria-label="Clear search"
+            className="absolute top-1/2 right-3 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted active:bg-surface-2"
           >
-            Documentation
-          </a>
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
+      {words && words.length === 0 ? (
+        <EmptyState
+          icon={<BookOpen size={28} />}
+          title="No words yet"
+          hint="Paste a single word or a whole vocabulary list — Vokabi finds articles and translations for you."
+          action={
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus size={18} /> Add your first words
+            </Button>
+          }
+        />
+      ) : filtered.length === 0 && query ? (
+        <EmptyState
+          icon={<Search size={28} />}
+          title="Nothing found"
+          hint={`No words match “${query}”.`}
+        />
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {filtered.map((w, i) => (
+            <WordRow key={w.id} word={w} index={i} />
+          ))}
         </div>
-      </main>
+      )}
+
+      {/* Floating add button */}
+      <button
+        onClick={() => setAddOpen(true)}
+        aria-label="Add words"
+        className="fixed right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 cursor-pointer items-center justify-center rounded-2xl bg-primary text-on-primary shadow-xl transition-transform active:scale-90"
+      >
+        <Plus size={26} />
+      </button>
+
+      <AddWordsSheet open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }
