@@ -3,38 +3,35 @@
 /**
  * Speech synthesis helpers. Picks the highest-quality German voice available
  * on the device (Android Chrome ships Google's natural de-DE voices).
+ *
+ * Android Chrome quirks handled here:
+ * - speak() right after cancel() is sometimes silently dropped → watchdog retries once
+ * - the synth can wake up in a paused state → always resume() before speak()
+ * - getVoices() is empty until "voiceschanged" → never block on it; utterance.lang
+ *   alone is enough for the default Google TTS engine to speak German
+ * - onend occasionally never fires → hard timeout so playlists can't hang
  */
 
 let voicesLoaded = false;
-let voiceListeners: (() => void)[] = [];
 
 export function initVoices() {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   const synth = window.speechSynthesis;
-  const notify = () => {
+  if (synth.getVoices().length > 0) {
     voicesLoaded = true;
-    voiceListeners.forEach((l) => l());
-    voiceListeners = [];
-  };
-  if (synth.getVoices().length > 0) notify();
-  else synth.addEventListener("voiceschanged", notify, { once: true });
+    return;
+  }
+  synth.addEventListener(
+    "voiceschanged",
+    () => {
+      voicesLoaded = true;
+    },
+    { once: true }
+  );
 }
 
 export function ttsSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
-}
-
-async function ensureVoices(): Promise<void> {
-  if (!ttsSupported()) return;
-  if (voicesLoaded || window.speechSynthesis.getVoices().length > 0) return;
-  initVoices();
-  await new Promise<void>((resolve) => {
-    const t = setTimeout(resolve, 1500); // don't hang if event never fires
-    voiceListeners.push(() => {
-      clearTimeout(t);
-      resolve();
-    });
-  });
 }
 
 const QUALITY_HINTS = ["natural", "neural", "premium", "enhanced", "google", "siri"];
@@ -53,7 +50,7 @@ function voiceScore(v: SpeechSynthesisVoice): number {
   QUALITY_HINTS.forEach((hint, i) => {
     if (name.includes(hint)) score += 100 - i * 10;
   });
-  if (v.lang === "de-DE") score += 20;
+  if (v.lang === "de-DE" || v.lang === "de_DE") score += 20;
   if (v.localService) score += 5; // works offline
   return score;
 }
@@ -61,6 +58,7 @@ function voiceScore(v: SpeechSynthesisVoice): number {
 function pickVoice(lang: string, preferredURI?: string): SpeechSynthesisVoice | null {
   if (!ttsSupported()) return null;
   const voices = window.speechSynthesis.getVoices();
+  if (voices.length === 0) return null; // let utterance.lang choose the engine default
   if (lang.startsWith("de")) {
     const german = getGermanVoices();
     if (preferredURI) {
@@ -81,23 +79,82 @@ export interface SpeakOptions {
   voiceURI?: string;
 }
 
-/** Speak text; resolves when finished or cancelled. */
-export async function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
-  if (!ttsSupported() || !text.trim()) return;
-  await ensureVoices();
+const HARD_TIMEOUT_MS = 20000;
+
+/** Speak text; resolves when finished, cancelled, or given up on. Never rejects. */
+export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
+  if (!ttsSupported() || !text.trim()) return Promise.resolve();
+  if (!voicesLoaded) initVoices();
   const synth = window.speechSynthesis;
+
   return new Promise((resolve) => {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = opts.lang ?? "de-DE";
     u.rate = opts.rate ?? 1;
     const voice = pickVoice(u.lang, opts.voiceURI);
     if (voice) u.voice = voice;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
-    synth.speak(u);
+
+    let done = false;
+    let started = false;
+    let retried = false;
+    let idleMs = 0;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearInterval(watchdog);
+      clearTimeout(hardStop);
+      resolve();
+    };
+
+    u.onstart = () => {
+      started = true;
+    };
+    u.onend = finish;
+    u.onerror = finish;
+
+    // Watchdog: if the utterance never starts (Android drops utterances queued
+    // right after cancel()), re-queue it once, then give up gracefully.
+    const watchdog = setInterval(() => {
+      if (done) return;
+      if (started || synth.speaking || synth.pending) {
+        idleMs = 0;
+        return;
+      }
+      idleMs += 250;
+      if (idleMs >= 1000) {
+        idleMs = 0;
+        if (!retried) {
+          retried = true;
+          try {
+            synth.resume();
+            synth.speak(u);
+          } catch {
+            finish();
+          }
+        } else {
+          finish();
+        }
+      }
+    }, 250);
+
+    const hardStop = setTimeout(finish, HARD_TIMEOUT_MS);
+
+    try {
+      synth.resume(); // Android Chrome sometimes wakes up paused
+      synth.speak(u);
+    } catch {
+      finish();
+    }
   });
 }
 
 export function stopSpeaking() {
-  if (ttsSupported()) window.speechSynthesis.cancel();
+  if (ttsSupported()) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // ignore
+    }
+  }
 }

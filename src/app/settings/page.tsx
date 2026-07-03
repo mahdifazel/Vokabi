@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   Download,
@@ -53,7 +53,20 @@ export default function SettingsPage() {
   const [importMsg, setImportMsg] = useState("");
   const [retrying, setRetrying] = useState(false);
   const wordCount = useLiveQuery(() => db.words.count(), []) ?? 0;
-  const voices = getGermanVoices();
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  useEffect(() => {
+    // voices load asynchronously on Android — refresh once they arrive
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const update = () => setVoices(getGermanVoices());
+    const initial = setTimeout(update, 0);
+    synth.addEventListener("voiceschanged", update);
+    return () => {
+      clearTimeout(initial);
+      synth.removeEventListener("voiceschanged", update);
+    };
+  }, []);
 
   async function previewVoice() {
     await speak("Guten Tag! Willkommen bei Vokabi.", {
