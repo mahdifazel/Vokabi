@@ -7,6 +7,8 @@ import { BookOpen, FolderOpen, Heart, Settings } from "lucide-react";
 import { cn } from "./ui";
 import { initVoices } from "@/lib/tts";
 import { applyTheme, getSettings } from "@/lib/settings";
+import { initAuth } from "@/lib/auth";
+import { initSync, syncNow } from "@/lib/sync";
 import { MiniPlayer } from "./mini-player";
 
 const TABS = [
@@ -21,6 +23,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     initVoices();
+    initSync();
+    initAuth((user) => {
+      if (user) void syncNow(); // pull the account's words on login / app start
+    });
     // keep "system" theme in sync when OS theme changes
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => applyTheme(getSettings().theme);

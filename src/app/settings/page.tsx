@@ -22,6 +22,7 @@ import {
   wordsToJSON,
 } from "@/lib/words";
 import { Button, Card, Segmented, Switch, cn } from "@/components/ui";
+import { AccountCard } from "@/components/account-card";
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5] as const;
 const PAUSES = [0, 0.5, 1, 2, 3, 5] as const;
@@ -99,6 +100,8 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-black tracking-tight">Settings</h1>
         <p className="text-sm font-semibold text-muted">Audio, appearance and your data</p>
       </header>
+
+      <AccountCard />
 
       {/* Audio settings */}
       <Card className="mb-4 px-4 py-2">

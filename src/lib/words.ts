@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { buildWord, lookupWord, splitWordList, type ParsedInput } from "./dictionary";
+import { scheduleSync } from "./sync";
 import type { Word } from "./types";
 
 /**
@@ -102,19 +103,27 @@ export async function setWordGroups(wordId: number, groupIds: number[]) {
 }
 
 export async function deleteWord(wordId: number) {
-  await db.words.delete(wordId);
+  const word = await db.words.get(wordId);
+  await db.transaction("rw", db.words, db.outbox, async () => {
+    if (word?.uid) await db.outbox.add({ table: "words", uid: word.uid });
+    await db.words.delete(wordId);
+  });
+  scheduleSync();
 }
 
 export async function deleteGroupAndDetachWords(groupId: number) {
   const members = await db.words.where("groupIds").equals(groupId).toArray();
-  await db.transaction("rw", db.words, db.groups, async () => {
+  const group = await db.groups.get(groupId);
+  await db.transaction("rw", db.words, db.groups, db.outbox, async () => {
     for (const w of members) {
       await db.words.update(w.id!, {
         groupIds: w.groupIds.filter((g) => g !== groupId),
       });
     }
+    if (group?.uid) await db.outbox.add({ table: "groups", uid: group.uid });
     await db.groups.delete(groupId);
   });
+  scheduleSync();
 }
 
 // ---------------------------------------------------------------------------

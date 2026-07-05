@@ -37,3 +37,21 @@ Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · Framer M
 - `src/lib/player.ts` — playback engine driven by user settings; cancellation via generation counter
 - `src/lib/speech.ts` — SpeechRecognition scoring (Levenshtein + LCS char diff)
 - TTS is pluggable: swap `src/lib/tts.ts` for Azure/Google Cloud TTS later; cloud sync can hook into the Dexie tables
+
+## Cloud sync setup (accounts)
+
+The app runs local-only until you connect a free [Supabase](https://supabase.com) project:
+
+1. Create a project at [database.new](https://database.new)
+2. In the dashboard, open **SQL Editor**, paste the contents of `supabase/schema.sql`, and click **Run**
+3. Go to **Project Settings → API** and copy the **Project URL** and the **anon public** key
+4. Add both as environment variables:
+   - Locally: create `.env.local` with
+     ```
+     NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+     NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+     ```
+   - On Vercel: Project → Settings → Environment Variables → add both → redeploy
+5. (Optional) In **Authentication → Sign In / Up → Email**, turn off "Confirm email" if you want instant sign-ups without a confirmation mail
+
+Sign in from the app's Settings tab. Words and groups sync automatically a few seconds after every change, on login, and when coming back online. Each user only sees their own words (enforced by Postgres row-level security). Words added before signing in are uploaded to the account on first sync.

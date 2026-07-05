@@ -18,6 +18,10 @@ export type WordStatus = "pending" | "ready" | "notfound";
 
 export interface Word {
   id?: number;
+  /** globally unique id used for cloud sync */
+  uid?: string;
+  /** 1 = has local changes not yet pushed to the cloud */
+  dirty?: 0 | 1;
   /** German word without article, e.g. "Haus" */
   german: string;
   article?: Article;
@@ -37,8 +41,20 @@ export interface Word {
 
 export interface Group {
   id?: number;
+  /** globally unique id used for cloud sync */
+  uid?: string;
+  /** 1 = has local changes not yet pushed to the cloud */
+  dirty?: 0 | 1;
   name: string;
   createdAt: number;
+  updatedAt?: number;
+}
+
+/** Tombstone for a row deleted locally, awaiting cloud deletion */
+export interface OutboxEntry {
+  id?: number;
+  table: "words" | "groups";
+  uid: string;
 }
 
 export interface AppSettings {
