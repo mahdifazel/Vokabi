@@ -92,7 +92,7 @@ export function Splash() {
         transition={{ duration: 1.8, delay: 0.25, ease: EASE }}
       />
 
-      {/* logo reveal: scale + fade + de-blur, then a glass shine sweep */}
+      {/* logo reveal: scale + fade + de-blur */}
       <motion.div
         className="relative"
         initial={
@@ -109,18 +109,6 @@ export function Splash() {
       >
         <div className="overflow-hidden rounded-[28px] shadow-[0_24px_60px_rgb(67_52_212/0.35)]">
           <VokabiLogo size={104} />
-          {!reduce && (
-            <motion.div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.38) 50%, transparent 62%)",
-              }}
-              initial={{ x: "-130%" }}
-              animate={{ x: "130%" }}
-              transition={{ duration: 1.0, delay: 1.35, ease: "easeInOut" }}
-            />
-          )}
         </div>
       </motion.div>
 
