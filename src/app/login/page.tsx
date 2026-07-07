@@ -6,6 +6,7 @@ import { ArrowLeft, CloudOff, Loader2, LogIn, UserRoundPlus } from "lucide-react
 import { signIn, signUp, useUser } from "@/lib/auth";
 import { cloudConfigured } from "@/lib/supabase";
 import { Button, Card, Input } from "@/components/ui";
+import { VokabiLogo } from "@/components/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,9 +58,7 @@ export default function LoginPage() {
       <div className="flex flex-1 flex-col justify-center pb-24">
         {/* Brand */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-primary text-3xl font-black text-on-primary shadow-lg">
-            V
-          </div>
+          <VokabiLogo size={72} className="mx-auto mb-4 rounded-3xl shadow-lg" />
           <h1 className="text-2xl font-black tracking-tight">
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>

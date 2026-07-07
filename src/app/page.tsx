@@ -9,6 +9,7 @@ import { startPlaylist } from "@/lib/player";
 import { WordRow } from "@/components/word-row";
 import { AddWordsSheet } from "@/components/add-words-sheet";
 import { Button, EmptyState, Input } from "@/components/ui";
+import { VokabiLogo } from "@/components/logo";
 
 export default function WordsPage() {
   const [query, setQuery] = useState("");
@@ -27,11 +28,14 @@ export default function WordsPage() {
   return (
     <div className="px-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
       <header className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">Vokabi</h1>
-          <p className="text-sm font-semibold text-muted">
-            {words ? `${words.length} word${words.length === 1 ? "" : "s"}` : "…"}
-          </p>
+        <div className="flex items-center gap-3">
+          <VokabiLogo size={40} />
+          <div>
+            <h1 className="text-2xl font-black tracking-tight">Vokabi</h1>
+            <p className="text-sm font-semibold text-muted">
+              {words ? `${words.length} word${words.length === 1 ? "" : "s"}` : "…"}
+            </p>
+          </div>
         </div>
         {filtered.length > 0 && (
           <Button
