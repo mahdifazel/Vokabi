@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence } from "framer-motion";
 import { BookOpen, FolderOpen, Heart, Settings } from "lucide-react";
 import { cn } from "./ui";
 import { initVoices } from "@/lib/tts";
@@ -11,7 +12,7 @@ import { initAuth, useAuthReady, useUser } from "@/lib/auth";
 import { cloudConfigured } from "@/lib/supabase";
 import { initSync, syncNow } from "@/lib/sync";
 import { MiniPlayer } from "./mini-player";
-import { VokabiLogo } from "./logo";
+import { Splash } from "./splash";
 
 const TABS = [
   { href: "/", label: "Words", icon: BookOpen },
@@ -28,6 +29,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   // accounts are required whenever cloud sync is configured
   const gated = cloudConfigured();
   const isLogin = pathname === "/login";
+
+  // cinematic splash: plays a minimum beat on app open, and keeps covering
+  // the screen while the session restores / the login redirect is in flight
+  const [splashDone, setSplashDone] = useState(false);
+  const showSplash =
+    !splashDone || (gated && (!authReady || (!user && !isLogin)));
+
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const t = setTimeout(() => setSplashDone(true), reduce ? 700 : 2700);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (gated && authReady && !user && !isLogin) {
@@ -52,22 +65,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
+  const splash = (
+    <AnimatePresence>{showSplash && <Splash key="splash" />}</AnimatePresence>
+  );
+
   // login screen stands alone — no bottom nav, no player
   if (isLogin) {
     return (
-      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">{children}</div>
+      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
+        {children}
+        {splash}
+      </div>
     );
   }
 
-  // while the session restores (or the redirect above runs), show a splash
-  // instead of flashing protected content
+  // session restoring / redirect in flight — the splash overlay covers this
   if (gated && (!authReady || !user)) {
-    return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4">
-        <VokabiLogo size={72} className="rounded-3xl shadow-lg" />
-        <p className="text-sm font-bold text-muted">Loading…</p>
-      </div>
-    );
+    return <div className="min-h-dvh">{splash}</div>;
   }
 
   return (
@@ -103,6 +117,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </div>
       </nav>
+      {splash}
     </div>
   );
 }
