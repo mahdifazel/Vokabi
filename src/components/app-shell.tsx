@@ -13,6 +13,7 @@ import { cloudConfigured } from "@/lib/supabase";
 import { initSync, syncNow } from "@/lib/sync";
 import { MiniPlayer } from "./mini-player";
 import { Splash } from "./splash";
+import { AnnouncementBanner } from "./announcement-banner";
 
 const TABS = [
   { href: "/", label: "Words", icon: BookOpen },
@@ -69,6 +70,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     <AnimatePresence>{showSplash && <Splash key="splash" />}</AnimatePresence>
   );
 
+  // the back office brings its own layout and guard
+  if (pathname.startsWith("/admin")) {
+    return <>{children}</>;
+  }
+
   // login screen stands alone — no bottom nav, no player
   if (isLogin) {
     return (
@@ -86,6 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col md:max-w-2xl lg:max-w-3xl">
+      <AnnouncementBanner />
       <main className="flex-1 pb-40">{children}</main>
       <MiniPlayer />
       <nav

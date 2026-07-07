@@ -55,3 +55,18 @@ The app runs local-only until you connect a free [Supabase](https://supabase.com
 5. (Optional) In **Authentication → Sign In / Up → Email**, turn off "Confirm email" if you want instant sign-ups without a confirmation mail
 
 Sign in from the app's Settings tab. Words and groups sync automatically a few seconds after every change, on login, and when coming back online. Each user only sees their own words (enforced by Postgres row-level security). Words added before signing in are uploaded to the account on first sync.
+
+## Back office (admin)
+
+The admin area lives at `/admin` (Users, Feedback, Announcements, Email). Setup:
+
+1. Run `supabase/admin-schema.sql` in the Supabase SQL Editor (feedback + announcements tables)
+2. Add environment variables on Vercel (and `.env.local` for local dev):
+   - `SUPABASE_SERVICE_ROLE_KEY` — Supabase → Project Settings → API → `service_role` key (server-only secret, never exposed to the browser)
+   - `ADMIN_EMAILS` — comma-separated allowlist, e.g. `uinermf@gmail.com`
+   - optional, for the Email tab: `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `Vokabi <hello@yourdomain.com>`) from [resend.com](https://resend.com)
+3. Redeploy. Sign in with an allowlisted email → Settings shows a **Back office** button.
+
+Capabilities: user list/detail with word counts, ban/unban, delete user + data,
+send password reset; feedback inbox (users submit from Settings); announcement
+banners shown in-app; broadcast email via Resend.

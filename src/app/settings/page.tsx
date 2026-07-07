@@ -23,6 +23,7 @@ import {
 } from "@/lib/words";
 import { Button, Card, Segmented, Switch, cn } from "@/components/ui";
 import { AccountCard } from "@/components/account-card";
+import { FeedbackCard } from "@/components/feedback-card";
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5] as const;
 const PAUSES = [0, 0.5, 1, 2, 3, 5] as const;
@@ -302,6 +303,8 @@ export default function SettingsPage() {
           }}
         />
       </Card>
+
+      <FeedbackCard />
 
       <p className="pb-6 text-center text-xs font-semibold text-muted">
         Vokabi · your personal German vocabulary trainer

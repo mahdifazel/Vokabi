@@ -1,15 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CloudOff, LogIn, LogOut, RefreshCw, UserRound } from "lucide-react";
+import { CloudOff, LogIn, LogOut, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 import { signOut, useUser } from "@/lib/auth";
 import { syncNow, useSyncState } from "@/lib/sync";
 import { cloudConfigured } from "@/lib/supabase";
+import { adminFetch } from "@/lib/admin/client";
 import { Button, Card } from "./ui";
 
 export function AccountCard() {
   const user = useUser();
   const sync = useSyncState();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    adminFetch("/api/admin/me")
+      .then(() => !cancelled && setIsAdmin(true))
+      .catch(() => !cancelled && setIsAdmin(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   if (!cloudConfigured()) {
     return (
@@ -68,6 +82,13 @@ export function AccountCard() {
               />
               Sync now
             </Button>
+            {isAdmin && (
+              <Link href="/admin">
+                <Button variant="secondary" size="sm">
+                  <ShieldCheck size={16} /> Back office
+                </Button>
+              </Link>
+            )}
             <Button variant="destructive" size="sm" onClick={() => void signOut()}>
               <LogOut size={16} /> Sign out
             </Button>
