@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CloudOff, Loader2, LogIn, UserRoundPlus } from "lucide-react";
+import { CloudOff, Loader2, LogIn, UserRoundPlus } from "lucide-react";
 import { signIn, signUp, useUser } from "@/lib/auth";
 import { cloudConfigured } from "@/lib/supabase";
 import { Button, Card, Input } from "@/components/ui";
@@ -45,16 +45,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-[80dvh] flex-col px-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
-      <header className="mb-2 flex items-center">
-        <button
-          onClick={() => router.back()}
-          aria-label="Back"
-          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-2xl text-muted active:bg-surface-2"
-        >
-          <ArrowLeft size={22} />
-        </button>
-      </header>
-
       <div className="flex flex-1 flex-col justify-center pb-24">
         {/* Brand */}
         <div className="mb-8 text-center">
@@ -151,7 +141,7 @@ export default function LoginPage() {
         )}
 
         <p className="mt-6 text-center text-xs font-semibold text-muted">
-          Words you add before signing in are uploaded to your account automatically.
+          Your words are stored in your account and synced to all your devices.
         </p>
       </div>
     </div>

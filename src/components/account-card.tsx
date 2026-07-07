@@ -76,8 +76,7 @@ export function AccountCard() {
       ) : (
         <div className="py-3 pb-4">
           <p className="mb-3 text-sm font-semibold text-muted">
-            Sign in to back up your words and use them on any device. Words you add before
-            signing in are uploaded to your account.
+            Sign in to add words and use them on any device.
           </p>
           <Link href="/login">
             <Button>

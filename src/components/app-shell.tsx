@@ -2,14 +2,16 @@
 
 import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { BookOpen, FolderOpen, Heart, Settings } from "lucide-react";
 import { cn } from "./ui";
 import { initVoices } from "@/lib/tts";
 import { applyTheme, getSettings } from "@/lib/settings";
-import { initAuth } from "@/lib/auth";
+import { initAuth, useAuthReady, useUser } from "@/lib/auth";
+import { cloudConfigured } from "@/lib/supabase";
 import { initSync, syncNow } from "@/lib/sync";
 import { MiniPlayer } from "./mini-player";
+import { VokabiLogo } from "./logo";
 
 const TABS = [
   { href: "/", label: "Words", icon: BookOpen },
@@ -20,6 +22,18 @@ const TABS = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const user = useUser();
+  const authReady = useAuthReady();
+  // accounts are required whenever cloud sync is configured
+  const gated = cloudConfigured();
+  const isLogin = pathname === "/login";
+
+  useEffect(() => {
+    if (gated && authReady && !user && !isLogin) {
+      router.replace("/login");
+    }
+  }, [gated, authReady, user, isLogin, router]);
 
   useEffect(() => {
     initVoices();
@@ -37,6 +51,24 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
     return () => mq.removeEventListener("change", onChange);
   }, []);
+
+  // login screen stands alone — no bottom nav, no player
+  if (isLogin) {
+    return (
+      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">{children}</div>
+    );
+  }
+
+  // while the session restores (or the redirect above runs), show a splash
+  // instead of flashing protected content
+  if (gated && (!authReady || !user)) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4">
+        <VokabiLogo size={72} className="rounded-3xl shadow-lg" />
+        <p className="text-sm font-bold text-muted">Loading…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col md:max-w-2xl lg:max-w-3xl">

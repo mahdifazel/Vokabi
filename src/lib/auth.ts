@@ -5,6 +5,8 @@ import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "./supabase";
 
 let currentUser: User | null = null;
+/** true once the persisted session has been restored (or ruled out) */
+let authReady = false;
 let initialized = false;
 const listeners = new Set<() => void>();
 
@@ -16,9 +18,14 @@ export function initAuth(onUserChange?: (user: User | null) => void) {
   if (initialized) return;
   initialized = true;
   const supabase = getSupabase();
-  if (!supabase) return;
+  if (!supabase) {
+    authReady = true;
+    notify();
+    return;
+  }
   supabase.auth.getSession().then(({ data }) => {
     currentUser = data.session?.user ?? null;
+    authReady = true;
     notify();
     onUserChange?.(currentUser);
   });
@@ -26,6 +33,7 @@ export function initAuth(onUserChange?: (user: User | null) => void) {
     const next = session?.user ?? null;
     const changed = next?.id !== currentUser?.id;
     currentUser = next;
+    authReady = true;
     notify();
     if (changed) onUserChange?.(currentUser);
   });
@@ -44,6 +52,10 @@ function subscribe(cb: () => void) {
 
 export function useUser(): User | null {
   return useSyncExternalStore(subscribe, getUser, () => null);
+}
+
+export function useAuthReady(): boolean {
+  return useSyncExternalStore(subscribe, () => authReady, () => false);
 }
 
 export async function signIn(email: string, password: string): Promise<string | null> {
