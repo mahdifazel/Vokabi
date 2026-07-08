@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import type { Word } from "./types";
 import { getSettings } from "./settings";
 import { speak, stopSpeaking } from "./tts";
+import { pauseKeepAlive, startKeepAlive, stopKeepAlive } from "./keepalive";
 
 export interface PlayerState {
   words: Word[];
@@ -23,6 +24,49 @@ let generation = 0; // bumped to cancel an in-flight playback loop
 function setState(patch: Partial<PlayerState>) {
   state = { ...state, ...patch };
   listeners.forEach((l) => l());
+  updateMediaSession();
+}
+
+// ---------------------------------------------------------------------------
+// Media Session: lock-screen / notification controls while playing
+// ---------------------------------------------------------------------------
+
+function mediaSessionSupported() {
+  return typeof navigator !== "undefined" && "mediaSession" in navigator;
+}
+
+function registerMediaHandlers() {
+  if (!mediaSessionSupported()) return;
+  const ms = navigator.mediaSession;
+  try {
+    ms.setActionHandler("play", () => resumePlayer());
+    ms.setActionHandler("pause", () => pausePlayer());
+    ms.setActionHandler("nexttrack", () => nextWord());
+    ms.setActionHandler("previoustrack", () => prevWord());
+    ms.setActionHandler("stop", () => stopPlayer());
+  } catch {
+    // some handlers unsupported on this platform — fine
+  }
+}
+
+function updateMediaSession() {
+  if (!mediaSessionSupported()) return;
+  const ms = navigator.mediaSession;
+  if (!state.active) {
+    ms.metadata = null;
+    ms.playbackState = "none";
+    return;
+  }
+  const word = state.words[Math.min(state.index, state.words.length - 1)];
+  if (word) {
+    ms.metadata = new MediaMetadata({
+      title: word.article ? `${word.article} ${word.german}` : word.german,
+      artist: word.english ?? "",
+      album: `Vokabi · ${state.title}`,
+      artwork: [{ src: "/icon.svg", sizes: "512x512", type: "image/svg+xml" }],
+    });
+  }
+  ms.playbackState = state.playing ? "playing" : "paused";
 }
 
 function subscribe(cb: () => void) {
@@ -79,6 +123,8 @@ export function startPlaylist(words: Word[], title: string, startIndex = 0) {
   const list = s.shuffle ? shuffled(words) : words;
   generation++;
   stopSpeaking();
+  startKeepAlive(); // keeps playback alive when the screen turns off
+  registerMediaHandlers();
   setState({ words: list, index: startIndex, playing: true, title, active: true });
   void runLoop(generation);
 }
@@ -128,18 +174,21 @@ async function runLoop(gen: number) {
 
 export function pausePlayer() {
   stopSpeaking();
+  pauseKeepAlive();
   setState({ playing: false });
 }
 
 export function resumePlayer() {
   if (!state.active) return;
   if (state.index >= state.words.length) setState({ index: 0 });
+  startKeepAlive();
   setState({ playing: true });
 }
 
 export function stopPlayer() {
   generation++;
   stopSpeaking();
+  stopKeepAlive();
   setState({ ...IDLE });
 }
 
