@@ -12,14 +12,17 @@ import { Button, Card } from "./ui";
 export function AccountCard() {
   const user = useUser();
   const sync = useSyncState();
-  const [isAdmin, setIsAdmin] = useState(false);
+  // track WHICH user was verified as admin, so a different account never
+  // inherits the button while its own check is still in flight
+  const [adminUserId, setAdminUserId] = useState<string | null>(null);
+  const isAdmin = !!user && adminUserId === user.id;
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     adminFetch("/api/admin/me")
-      .then(() => !cancelled && setIsAdmin(true))
-      .catch(() => !cancelled && setIsAdmin(false));
+      .then(() => !cancelled && setAdminUserId(user.id))
+      .catch(() => !cancelled && setAdminUserId(null));
     return () => {
       cancelled = true;
     };
