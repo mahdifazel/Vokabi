@@ -1,5 +1,5 @@
 /* Vokabi service worker — offline-first app shell */
-const CACHE = "vokabi-v4";
+const CACHE = "vokabi-v5";
 const OFFLINE_URLS = ["/", "/learn", "/settings", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

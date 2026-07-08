@@ -1,45 +1,36 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   BookOpen,
+  ChevronRight,
+  FolderOpen,
   FolderPlus,
   Heart,
-  MoreVertical,
-  Pencil,
-  Play,
   Plus,
   Search,
-  Shuffle,
-  Trash2,
   X,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { deleteGroupAndDetachWords, matchesQuery } from "@/lib/words";
-import { startPlaylist } from "@/lib/player";
-import { updateSettings, useSettings } from "@/lib/settings";
-import type { LearnSource } from "@/lib/learn";
+import { matchesQuery } from "@/lib/words";
 import { WordRow } from "@/components/word-row";
 import { AddWordsSheet } from "@/components/add-words-sheet";
 import { VokabiLogo } from "@/components/logo";
-import { Button, EmptyState, Input, Sheet, cn } from "@/components/ui";
+import { Button, Card, EmptyState, Input, Sheet } from "@/components/ui";
 
 export default function LibraryPage() {
-  const settings = useSettings();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<LearnSource>({ kind: "all" });
   const [addOpen, setAddOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [manageOpen, setManageOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const words = useLiveQuery(() => db.words.orderBy("createdAt").reverse().toArray(), []);
-  const groups = useLiveQuery(() => db.groups.orderBy("name").toArray(), []) ?? [];
+  const groups = useLiveQuery(() => db.groups.orderBy("name").toArray(), []);
 
   const favCount = useMemo(() => (words ?? []).filter((w) => w.favorite).length, [words]);
-  const groupCounts = useMemo(() => {
+  const counts = useMemo(() => {
     const map = new Map<number, number>();
     for (const w of words ?? []) {
       for (const g of w.groupIds) map.set(g, (map.get(g) ?? 0) + 1);
@@ -47,67 +38,42 @@ export default function LibraryPage() {
     return map;
   }, [words]);
 
-  const selectedGroup =
-    filter.kind === "group" ? groups.find((g) => g.id === filter.id) : undefined;
-
-  const filtered = useMemo(() => {
-    let list = words ?? [];
-    if (filter.kind === "fav") list = list.filter((w) => w.favorite);
-    if (filter.kind === "group") {
-      list = list.filter((w) => filter.id != null && w.groupIds.includes(filter.id));
-    }
-    return list.filter((w) => matchesQuery(w, query));
-  }, [words, filter, query]);
-
-  const playTitle =
-    filter.kind === "all" ? "All words" : filter.kind === "fav" ? "Favorites" : (selectedGroup?.name ?? "Group");
+  const searching = query.trim().length > 0;
+  const results = useMemo(
+    () => (searching ? (words ?? []).filter((w) => matchesQuery(w, query)) : []),
+    [words, query, searching]
+  );
 
   async function createGroup() {
     const name = groupName.trim();
     if (!name) return;
-    const id = (await db.groups.add({ name, createdAt: Date.now() })) as number;
+    await db.groups.add({ name, createdAt: Date.now() });
     setGroupName("");
     setCreateOpen(false);
-    setFilter({ kind: "group", id });
   }
-
-  async function renameGroup() {
-    const name = groupName.trim();
-    if (!name || filter.kind !== "group") return;
-    await db.groups.update(filter.id, { name });
-    setManageOpen(false);
-  }
-
-  async function removeGroup() {
-    if (filter.kind !== "group") return;
-    await deleteGroupAndDetachWords(filter.id);
-    setManageOpen(false);
-    setConfirmDelete(false);
-    setFilter({ kind: "all" });
-  }
-
-  const isSelected = (f: LearnSource) =>
-    f.kind === filter.kind && (f.kind !== "group" || (filter.kind === "group" && f.id === filter.id));
 
   return (
     <div className="px-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
       <header className="mb-4 flex items-center gap-3">
         <VokabiLogo size={40} />
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-black tracking-tight">Vokabi</h1>
           <p className="text-sm font-semibold text-muted">
             {words ? `${words.length} word${words.length === 1 ? "" : "s"}` : "…"}
           </p>
         </div>
+        <Button variant="secondary" size="sm" onClick={() => setCreateOpen(true)}>
+          <FolderPlus size={16} /> New group
+        </Button>
       </header>
 
-      {/* search */}
-      <div className="relative mb-3">
+      {/* find any word across the whole library */}
+      <div className="relative mb-4">
         <Search size={18} className="absolute top-1/2 left-4 -translate-y-1/2 text-muted" />
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search German, English or article…"
+          placeholder="Search all words…"
           className="pr-10 pl-11"
           type="search"
           aria-label="Search words"
@@ -123,74 +89,17 @@ export default function LibraryPage() {
         )}
       </div>
 
-      {/* group chips */}
-      <div className="scrollbar-none -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
-        <Chip
-          label={`All · ${words?.length ?? 0}`}
-          selected={isSelected({ kind: "all" })}
-          onClick={() => setFilter({ kind: "all" })}
-        />
-        {favCount > 0 && (
-          <Chip
-            label={`♥ ${favCount}`}
-            selected={isSelected({ kind: "fav" })}
-            onClick={() => setFilter({ kind: "fav" })}
-          />
-        )}
-        {groups.map((g) => (
-          <Chip
-            key={g.id}
-            label={`${g.name} · ${groupCounts.get(g.id!) ?? 0}`}
-            selected={isSelected({ kind: "group", id: g.id! })}
-            onClick={() => setFilter({ kind: "group", id: g.id! })}
-          />
-        ))}
-        <button
-          onClick={() => {
-            setGroupName("");
-            setCreateOpen(true);
-          }}
-          aria-label="New group"
-          className="flex h-9 shrink-0 cursor-pointer items-center gap-1 rounded-full bg-surface-2 px-3.5 text-sm font-bold whitespace-nowrap text-muted active:scale-95"
-        >
-          <FolderPlus size={15} /> New
-        </button>
-      </div>
-
-      {/* play row */}
-      {filtered.length > 0 && (
-        <div className="mb-4 flex gap-2">
-          <Button className="flex-1" onClick={() => startPlaylist(filtered, playTitle)}>
-            <Play size={18} /> Play {playTitle.toLowerCase()}
-          </Button>
-          <Button
-            variant={settings.shuffle ? "accent" : "secondary"}
-            size="icon"
-            aria-label={settings.shuffle ? "Shuffle on" : "Shuffle off"}
-            aria-pressed={settings.shuffle}
-            onClick={() => updateSettings({ shuffle: !settings.shuffle })}
-          >
-            <Shuffle size={18} />
-          </Button>
-          {selectedGroup && (
-            <Button
-              variant="secondary"
-              size="icon"
-              aria-label="Group options"
-              onClick={() => {
-                setGroupName(selectedGroup.name);
-                setConfirmDelete(false);
-                setManageOpen(true);
-              }}
-            >
-              <MoreVertical size={18} />
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* word list */}
-      {words && words.length === 0 ? (
+      {searching ? (
+        results.length === 0 ? (
+          <EmptyState icon={<Search size={28} />} title="Nothing found" hint={`No words match “${query}”.`} />
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {results.map((w, i) => (
+              <WordRow key={w.id} word={w} index={i} />
+            ))}
+          </div>
+        )
+      ) : words && words.length === 0 && (groups?.length ?? 0) <= 1 ? (
         <EmptyState
           icon={<BookOpen size={28} />}
           title="No words yet"
@@ -201,27 +110,66 @@ export default function LibraryPage() {
             </Button>
           }
         />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={filter.kind === "fav" ? <Heart size={28} /> : <Search size={28} />}
-          title={query ? "Nothing found" : filter.kind === "fav" ? "No favorites yet" : "This group is empty"}
-          hint={
-            query
-              ? `No words match “${query}”.`
-              : filter.kind === "fav"
-                ? "Tap the heart on any word to collect it here."
-                : "Add words to this group with the + button."
-          }
-        />
       ) : (
         <div className="flex flex-col gap-2.5">
-          {filtered.map((w, i) => (
-            <WordRow key={w.id} word={w} index={i} />
-          ))}
+          {/* All words */}
+          <Link href="/all" className="cursor-pointer">
+            <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+                <BookOpen size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-extrabold">All words</p>
+                <p className="text-sm font-semibold text-muted">
+                  {words?.length ?? 0} word{(words?.length ?? 0) === 1 ? "" : "s"}
+                </p>
+              </div>
+              <ChevronRight size={18} className="text-muted" />
+            </Card>
+          </Link>
+
+          {/* Favorites */}
+          {favCount > 0 && (
+            <Link href="/favorites" className="cursor-pointer">
+              <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-100 text-rose-500 dark:bg-rose-500/15 dark:text-rose-400">
+                  <Heart size={20} fill="currentColor" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-extrabold">Favorites</p>
+                  <p className="text-sm font-semibold text-muted">
+                    {favCount} word{favCount === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <ChevronRight size={18} className="text-muted" />
+              </Card>
+            </Link>
+          )}
+
+          {/* Groups */}
+          {groups?.map((g) => {
+            const n = counts.get(g.id!) ?? 0;
+            return (
+              <Link key={g.id} href={`/groups/${g.id}`} className="cursor-pointer">
+                <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+                    <FolderOpen size={20} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-extrabold">{g.name}</p>
+                    <p className="text-sm font-semibold text-muted">
+                      {n} word{n === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <ChevronRight size={18} className="text-muted" />
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
 
-      {/* add words FAB — adds into the selected group */}
+      {/* add words FAB */}
       <button
         onClick={() => setAddOpen(true)}
         aria-label="Add words"
@@ -230,14 +178,8 @@ export default function LibraryPage() {
         <Plus size={26} />
       </button>
 
-      <AddWordsSheet
-        key={filter.kind === "group" ? filter.id : "none"}
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        defaultGroupId={filter.kind === "group" ? filter.id : undefined}
-      />
+      <AddWordsSheet open={addOpen} onClose={() => setAddOpen(false)} />
 
-      {/* new group */}
       <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="New group">
         <Input
           value={groupName}
@@ -250,76 +192,6 @@ export default function LibraryPage() {
           Create group
         </Button>
       </Sheet>
-
-      {/* manage selected group */}
-      <Sheet
-        open={manageOpen}
-        onClose={() => setManageOpen(false)}
-        title={selectedGroup?.name ?? "Group"}
-      >
-        <div className="flex flex-col gap-3 pb-2">
-          <label className="text-sm font-extrabold">
-            Rename
-            <div className="mt-1 flex gap-2">
-              <Input
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && renameGroup()}
-              />
-              <Button disabled={!groupName.trim()} onClick={renameGroup}>
-                <Pencil size={16} /> Save
-              </Button>
-            </div>
-          </label>
-          {!confirmDelete ? (
-            <Button
-              variant="destructive"
-              className="w-full justify-start"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 size={18} /> Delete group
-            </Button>
-          ) : (
-            <div className="rounded-2xl bg-destructive/10 p-4">
-              <p className="mb-3 text-sm font-bold text-destructive">
-                Delete “{selectedGroup?.name}”? Words stay in your library — only the group is
-                removed.
-              </p>
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(false)}>
-                  Cancel
-                </Button>
-                <Button size="sm" className="bg-destructive text-white" onClick={removeGroup}>
-                  Delete
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </Sheet>
     </div>
-  );
-}
-
-function Chip({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={selected}
-      className={cn(
-        "h-9 shrink-0 cursor-pointer rounded-full px-3.5 text-sm font-bold whitespace-nowrap transition-all active:scale-95",
-        selected ? "bg-primary text-on-primary" : "bg-surface-2 text-muted"
-      )}
-    >
-      {label}
-    </button>
   );
 }

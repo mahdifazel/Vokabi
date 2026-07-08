@@ -80,6 +80,17 @@ async function enrichOne(input: ParsedInput, id: number) {
   }
 }
 
+/**
+ * Every account starts with a "General" group so first-time users have an
+ * obvious place for their words. Only created when no groups exist at all.
+ */
+export async function ensureDefaultGroup() {
+  const count = await db.groups.count();
+  if (count === 0) {
+    await db.groups.add({ name: "General", createdAt: Date.now() });
+  }
+}
+
 /** Retry enrichment for words that previously failed (e.g. added offline) */
 export async function retryPendingLookups() {
   const stale = await db.words.filter((w) => w.status !== "ready").toArray();

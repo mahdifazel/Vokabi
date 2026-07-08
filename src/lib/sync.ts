@@ -216,6 +216,12 @@ export async function syncNow(): Promise<void> {
       if (staleGroups.length > 0) await db.groups.bulkDelete(staleGroups.map((g) => g.id!));
     });
 
+    // brand-new account with no groups anywhere → seed the default group
+    // (after the pull, so an existing "General" from another device wins)
+    if ((await db.groups.count()) === 0) {
+      await db.groups.add({ name: "General", createdAt: Date.now() });
+    }
+
     const now = Date.now();
     localStorage.setItem(LAST_SYNC_KEY, String(now));
     localStorage.setItem(LAST_USER_KEY, user.id);

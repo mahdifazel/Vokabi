@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check, ClipboardPaste, Loader2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { addWordsFromText } from "@/lib/words";
 import { splitWordList } from "@/lib/dictionary";
+import type { Group } from "@/lib/types";
 import { Button, Sheet, Textarea, cn } from "./ui";
+
+const EMPTY_GROUPS: Group[] = [];
 
 export function AddWordsSheet({
   open,
@@ -23,7 +26,27 @@ export function AddWordsSheet({
   );
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
-  const groups = useLiveQuery(() => db.groups.orderBy("name").toArray(), []) ?? [];
+  const groupsQuery = useLiveQuery(() => db.groups.orderBy("name").toArray(), []);
+  const groups = groupsQuery ?? EMPTY_GROUPS;
+  const preselected = useRef(false);
+
+  // no explicit target group → default to "General" so first-time words land somewhere
+  useEffect(() => {
+    if (!open) {
+      preselected.current = false;
+      return;
+    }
+    if (preselected.current || defaultGroupId != null) return;
+    const general = groups.find((g) => g.name.toLowerCase() === "general");
+    if (general?.id != null) {
+      preselected.current = true;
+      const t = setTimeout(
+        () => setSelectedGroups((sel) => (sel.length === 0 ? [general.id!] : sel)),
+        0
+      );
+      return () => clearTimeout(t);
+    }
+  }, [open, groups, defaultGroupId]);
 
   const count = splitWordList(text).length;
 
