@@ -1,72 +1,88 @@
 # Vokabi — German Vocabulary Trainer
 
-A mobile-first PWA for learning German vocabulary: native pronunciation, speaking practice, word groups, and listening playlists. All data lives on-device (IndexedDB) and the app works offline.
+**Live at [vokabi.app](https://vokabi.app)**
 
-## Run
-
-```bash
-npm install
-npm run dev        # development at http://localhost:3000
-npm run build && npm start   # production (service worker enabled)
-```
-
-For the full PWA experience, open it in Chrome on Android and "Add to Home Screen".
+A mobile-first Progressive Web App for learning German vocabulary. Paste words, get automatic articles/translations/plurals, hear native pronunciation (even with the screen off), practice speaking with instant feedback, and train with flashcards and quizzes. Offline-first with per-user cloud sync.
 
 ## Features
 
-- **Add words in bulk** — paste one word or a whole list; articles like "das Haus" are detected
-- **Automatic dictionary** — article (der/die/das), English translation, plural, IPA, and part of speech via a built-in offline seed dictionary (~300 A1/A2 words), Wiktionary, and a translation fallback; results are cached in IndexedDB
-- **Native pronunciation** — best available German system voice (Google natural voices on Android), selectable in Settings
-- **Pronunciation practice** — speak the word, get Excellent / Good / Needs improvement feedback with per-letter mistake highlighting (Web Speech API)
-- **Groups** — create/rename/delete groups, words can belong to several
-- **Playlists** — play a whole group with configurable speed (0.5–1.5×), pause between words (0–5 s), repeat count (1–5×), read article, read translation, shuffle, and endless auto-repeat; mini-player with prev/pause/next
-- **Favorites** — heart any word; favorites act as their own group
-- **Search** — instant search across German, English, plural, and article
-- **Word details** — plural, IPA, example sentence, notes, group membership, slow playback, edit everything
-- **Import/Export** — import TXT/CSV (with or without translations), export CSV/JSON
-- **Dark/light/system theme**, offline-first service worker, installable PWA
+- **Bulk word adding** — paste one word or a whole list; `das Haus`-style articles are detected automatically
+- **Automatic dictionary** — article (🔵 der / 🔴 die / 🟢 das), English translation, plural, IPA, and part of speech via a bundled ~300-word offline seed dictionary → Wiktionary → translation-API fallback, cached in IndexedDB
+- **Native pronunciation** — best available German system voice (Google natural voices on Android), voice picker, 0.5–1.5× speed, slow-play button
+- **Listening playlists** — play a group with configurable pause (0–5 s), repeat count (1–5×), read-article and read-translation toggles, shuffle, endless loop; floating mini-player
+- **Screen-off playback** — audio keeps playing when the phone is locked, with lock-screen media controls (current word, play/pause/next/prev)
+- **Pronunciation practice** — speak the word, get *Excellent / Good / Needs improvement* with mistake letters highlighted (speech recognition)
+- **Flashcards** — 3D flip cards, swipe right = got it / left = still learning, retry-missed rounds
+- **Quiz** — multiple choice: German→English, English→German, and der/die/das article questions with audio feedback
+- **Organization** — groups (with a default **General** group), favorites, instant global search, word details with examples and notes
+- **Import / export** — TXT/CSV import, CSV/JSON export
+- **Accounts & sync** — email/password login (Supabase); words sync across devices, protected by Postgres row-level security; offline-first so everything works without a connection
+- **PWA** — installable on Android, offline service worker, dark/light/system theme, cinematic once-per-session splash
+- **Admin back office** (`/admin`) — user management (ban/delete/reset password), feedback inbox, announcement banners, email broadcast
 
-## Stack
+## Prerequisites
 
-Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · Framer Motion · Dexie (IndexedDB) · Web Speech API (TTS + recognition) · lucide-react
+- **Node.js 18+** (developed on Node 24) and npm
+- Optional, for accounts/sync/admin: a free [Supabase](https://supabase.com) project
+- Optional, for admin email broadcasts: a [Resend](https://resend.com) account
 
-## Architecture notes
+## Installation
 
-- `src/lib/db.ts` — Dexie schema: `words`, `groups`, `dictCache`
-- `src/lib/dictionary.ts` — lookup pipeline: seed → cache → en.wiktionary (gender/plural/IPA/definitions parsed from wikitext) → MyMemory translation fallback
-- `src/lib/player.ts` — playback engine driven by user settings; cancellation via generation counter
-- `src/lib/speech.ts` — SpeechRecognition scoring (Levenshtein + LCS char diff)
-- TTS is pluggable: swap `src/lib/tts.ts` for Azure/Google Cloud TTS later; cloud sync can hook into the Dexie tables
+```bash
+git clone https://github.com/mahdifazel/Vokabi.git
+cd Vokabi
+npm install
+npm run dev            # http://localhost:3000
+```
 
-## Cloud sync setup (accounts)
+Without any configuration the app runs in **local-only mode** (no login, data stays on the device).
 
-The app runs local-only until you connect a free [Supabase](https://supabase.com) project:
+### Enable accounts & cloud sync
 
-1. Create a project at [database.new](https://database.new)
-2. In the dashboard, open **SQL Editor**, paste the contents of `supabase/schema.sql`, and click **Run**
-3. Go to **Project Settings → API** and copy the **Project URL** and the **anon public** key
-4. Add both as environment variables:
-   - Locally: create `.env.local` with
-     ```
-     NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-     NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-     ```
-   - On Vercel: Project → Settings → Environment Variables → add both → redeploy
-5. (Optional) In **Authentication → Sign In / Up → Email**, turn off "Confirm email" if you want instant sign-ups without a confirmation mail
+1. Create a Supabase project at [database.new](https://database.new)
+2. In the Supabase **SQL Editor**, run `supabase/schema.sql`, then `supabase/admin-schema.sql`
+3. In **Authentication → URL Configuration**, set the Site URL to your domain; in **Sign In / Providers → Email**, consider disabling "Confirm email" (the built-in mailer is heavily rate-limited)
+4. Create `.env.local`:
 
-Sign in from the app's Settings tab. Words and groups sync automatically a few seconds after every change, on login, and when coming back online. Each user only sees their own words (enforced by Postgres row-level security). Words added before signing in are uploaded to the account on first sync.
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...        # anon/publishable key
+# back office (optional):
+SUPABASE_SERVICE_ROLE_KEY=eyJ...            # service_role key — keep secret
+ADMIN_EMAILS=you@example.com
+# admin email broadcasts (optional):
+RESEND_API_KEY=re_...
+EMAIL_FROM="Vokabi <hello@yourdomain.com>"
+```
 
-## Back office (admin)
+5. Restart the dev server. The app now requires login; sign up with an email listed in `ADMIN_EMAILS` to get the **Back office** button in Settings.
 
-The admin area lives at `/admin` (Users, Feedback, Announcements, Email). Setup:
+For production deployment see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
-1. Run `supabase/admin-schema.sql` in the Supabase SQL Editor (feedback + announcements tables)
-2. Add environment variables on Vercel (and `.env.local` for local dev):
-   - `SUPABASE_SERVICE_ROLE_KEY` — Supabase → Project Settings → API → `service_role` key (server-only secret, never exposed to the browser)
-   - `ADMIN_EMAILS` — comma-separated allowlist, e.g. `uinermf@gmail.com`
-   - optional, for the Email tab: `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `Vokabi <hello@yourdomain.com>`) from [resend.com](https://resend.com)
-3. Redeploy. Sign in with an allowlisted email → Settings shows a **Back office** button.
+## Usage
 
-Capabilities: user list/detail with word counts, ban/unban, delete user + data,
-send password reset; feedback inbox (users submit from Settings); announcement
-banners shown in-app; broadcast email via Resend.
+- **Add words**: tap **+** on the Library page and paste, e.g.:
+  ```
+  Haus
+  der Baum
+  Schmetterling
+  ```
+  Articles, translations, plurals, and IPA appear automatically a few seconds later.
+- **Listen**: open a group → **Play group**. Tune speed, pauses, repeats, and article/translation reading in **Settings → Audio**. Lock the phone — playback continues.
+- **Practice speaking**: open a word → 🎤 **Practice** → say the word → get graded feedback.
+- **Train**: **Learn** tab → pick a source → **Flashcards** or **Quiz**.
+- **Install on Android**: open vokabi.app in Chrome → menu → **Add to Home screen**.
+
+## Project documentation
+
+- [`CLAUDE.md`](CLAUDE.md) — developer/AI onboarding: stack, conventions, gotchas
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system design and data flow
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — why key technical choices were made
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — deploying to production
+- [`docs/TESTING.md`](docs/TESTING.md) — verification strategy
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to contribute
+- [`CHANGELOG.md`](CHANGELOG.md) — release history
+
+## License
+
+**No license has been chosen yet** — the code is currently "all rights reserved" by default. If you intend to open-source Vokabi, add a `LICENSE` file (MIT is the common choice for projects like this).

@@ -1,0 +1,81 @@
+# Technical Decisions
+
+Why Vokabi is built the way it is. Each entry: context → decision → trade-offs. Dates reference the git history (July 2026).
+
+## 1. Offline-first: IndexedDB as source of truth
+
+**Context:** A vocabulary trainer is used on commutes, in dead zones, abroad. The original spec demanded full offline support.
+**Decision:** Dexie/IndexedDB holds all data; every screen reads it via `useLiveQuery`. The cloud is a per-user replica, not the primary store.
+**Trade-offs:** Instant UI and true offline; but sync complexity lands on us (UUIDs, dirty flags, tombstones, LWW). Accepted because vocab data is small (hundreds of rows) and conflicts are rare for a personal dataset.
+
+## 2. Sync design: UUID identity + dirty flags + full pull with LWW
+
+**Context:** Dexie auto-increment ids differ per device, so rows need portable identity; deletions must propagate; two devices can edit offline.
+**Decision:** Every row gets a `uid` (crypto.randomUUID) stamped by Dexie hooks; local mutations set `dirty: 1`; deletions are tombstoned in an `outbox` table; sync pushes dirty/deleted, then pulls **everything** and merges last-write-wins by `updatedAt`; local group ids are translated to uids on the wire.
+**Trade-offs:** Full pull is O(dataset) per sync — wasteful for huge datasets, trivially fine for vocabulary scale, and it makes cross-device deletions reliable without change feeds. Rejected alternatives: CRDTs (overkill), incremental pull with change tracking (can't see remote deletions without extra bookkeeping).
+
+## 3. Supabase for auth + storage
+
+**Context:** "Users must log in and have their own words" — needed auth, a database, and per-user isolation, with zero server maintenance and a free tier.
+**Decision:** Supabase email/password auth + Postgres with row-level security (`auth.uid() = user_id` policies on every table).
+**Trade-offs:** Security is enforced *in the database*, so even a compromised client can't read others' data. Vendor lock-in is limited (plain Postgres). Rejected: Firebase (NoSQL modeling, heavier SDK), custom backend (maintenance cost).
+
+## 4. Web Speech API for TTS — no audio backend
+
+**Context:** "No robotic TTS" but also no API keys, no per-request costs, and offline playback.
+**Decision:** `speechSynthesis` with best-voice auto-selection (Android ships Google's natural de-DE voices). `lib/tts.ts` is deliberately pluggable if a cloud TTS is ever wanted.
+**Trade-offs:** Voice quality varies by device; Android Chrome has real bugs (utterances dropped after `cancel()`, paused wake-ups, lost `onend`) that required a watchdog/retry/hard-timeout layer. Accepted for zero cost + offline capability.
+
+## 5. Screen-off playback: near-silent keep-alive audio + Media Session
+
+**Context:** Users listen to word lists with the phone locked; Android suspends background tabs, killing speech synthesis and timers.
+**Decision:** While a playlist plays, loop a programmatically generated near-silent WAV (`lib/keepalive.ts`) so the tab counts as audible media (exempt from suspension), and register Media Session metadata/handlers for lock-screen controls.
+**Trade-offs:** It's the established web-app workaround, not an official API; aggressive OEM battery savers can still kill it. The definitive fix would be a TWA (Play Store app) — deferred.
+
+## 6. Hand-written service worker; `/api/` never cached
+
+**Context:** PWA offline support; later, a security incident where cached admin API responses leaked to another account on the same device.
+**Decision:** A small explicit `public/sw.js` (network-first navigations, cache-first static assets) instead of Workbox/next-pwa; API routes are excluded from caching entirely; cache name is version-bumped manually (`vokabi-vN`) to invalidate.
+**Trade-offs:** Manual cache-version bumps are easy to forget (documented in CLAUDE.md/CONTRIBUTING.md); in exchange the caching policy is fully auditable — which is how the admin-leak bug was found and fixed.
+
+## 7. Dictionary pipeline: seed → cache → Wiktionary → MyMemory
+
+**Context:** Automatic article/translation/plural/IPA lookup with no paid dictionary API, working offline for common words.
+**Decision:** A bundled ~300-word seed dictionary for instant/offline hits; en.wiktionary.org wikitext parsing (one request yields gender, plural template, IPA, and English definitions); MyMemory as translation-only fallback; everything cached in IndexedDB (90-day TTL, 7-day retry for misses).
+**Trade-offs:** Wikitext parsing is best-effort (notably `{{de-noun}}` plural forms); both APIs are unauthenticated with unknown rate limits. Words remain user-editable, which is the ultimate fallback.
+
+## 8. Module stores + `useSyncExternalStore` instead of a state library
+
+**Context:** Cross-cutting state (settings, player, auth, sync status) needed by distant components.
+**Decision:** Plain module-level state with subscriber sets, exposed through `useSyncExternalStore` hooks.
+**Trade-offs:** Zero dependencies, SSR-safe server snapshots, and the player loop can read/write state outside React (essential for the audio engine). Less tooling than Redux/Zustand — fine at this scale.
+
+## 9. Hand-rolled UI primitives (shadcn idiom, no Radix)
+
+**Context:** The spec named shadcn/ui; the app needs ~8 primitives, mobile-first.
+**Decision:** `components/ui.tsx` implements Button/Card/Input/Switch/Segmented/Sheet in the same visual idiom with Tailwind tokens + Framer Motion, without the Radix dependency tree.
+**Trade-offs:** Less a11y machinery than Radix (mitigated with explicit aria attributes); much smaller bundle and full control over mobile behavior (bottom sheets, touch targets).
+
+## 10. Admin authorization: `ADMIN_EMAILS` env allowlist
+
+**Context:** One (maybe a few) trusted admins; roles-in-database felt heavy.
+**Decision:** Server route handlers verify the caller's JWT via the service-role client, then check the email against a comma-separated env allowlist. The service-role key exists only server-side.
+**Trade-offs:** Adding an admin requires an env change + redeploy — acceptable at this scale. Client-side "is admin" checks exist purely for UI (showing the button); the server re-verifies every request.
+
+## 11. Login required when cloud is configured; local-only otherwise
+
+**Context:** Requirement: "no one can add words without logging in" — but development and self-hosting without Supabase should still work.
+**Decision:** The auth gate activates only when `NEXT_PUBLIC_SUPABASE_*` exist. Configured deployments redirect signed-out visitors to `/login`; unconfigured builds run the original local-only experience.
+**Trade-offs:** Two behavioral modes to keep in mind while developing; in exchange, no mock-auth complexity locally and the same codebase serves both modes.
+
+## 12. Splash screen: once per session, removed pre-paint on reloads
+
+**Context:** A branded 3-second intro was requested; Android reloads the PWA on app switches, which replayed it constantly (user complaint).
+**Decision:** `sessionStorage` flag; on reloads a layout effect flips state before first paint and bypasses `AnimatePresence`, so the splash never renders at all. It still covers genuine session restores.
+**Trade-offs:** Slightly intricate mounting logic (documented in code); the alternative — shortening the intro — would have degraded the intended first impression.
+
+## 13. Default "General" group, seeded after first sync
+
+**Context:** First-time users adding words with no groups yet would create invisible/orphaned-feeling words; the user explicitly wanted a default group.
+**Decision:** After a successful pull (cloud mode) or on first launch (local mode), if zero groups exist, create "General"; the add-words sheet preselects it when no group is chosen.
+**Trade-offs:** Seeding *after* the pull avoids duplicate "General" groups across devices. Name matching is by literal "general" for preselection — renaming it disables that convenience.
