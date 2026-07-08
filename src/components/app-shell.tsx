@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
@@ -31,23 +31,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   const gated = cloudConfigured();
   const isLogin = pathname === "/login";
 
-  // cinematic splash: plays a minimum beat on app open, and keeps covering
-  // the screen while the session restores / the login redirect is in flight
+  // cinematic splash: plays once per session on first load, and covers the
+  // screen while the session restores / the login redirect is in flight
   const [splashDone, setSplashDone] = useState(false);
+  const [skipSplash, setSkipSplash] = useState(false);
   const showSplash =
     !splashDone || (gated && (!authReady || (!user && !isLogin)));
 
-  useEffect(() => {
-    // full cinematic intro only once per session; on reloads (e.g. Android
-    // restoring the app after a tab/app switch) dismiss almost immediately
+  useLayoutEffect(() => {
     let played = false;
     try {
       played = sessionStorage.getItem("vokabi.splashPlayed") === "1";
     } catch {
       // storage unavailable — treat as first play
     }
+    if (played) {
+      // already played this session (reload, tab/app switch restore):
+      // flip state before first paint so the splash is never visible at all
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSkipSplash(true);
+      setSplashDone(true);
+      return;
+    }
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const delay = played ? 150 : reduce ? 700 : 2700;
     const t = setTimeout(() => {
       setSplashDone(true);
       try {
@@ -55,7 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       } catch {
         // ignore
       }
-    }, delay);
+    }, reduce ? 700 : 2700);
     return () => clearTimeout(t);
   }, []);
 
@@ -82,7 +88,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const splash = (
+  // skipSplash bypasses AnimatePresence entirely — no mount, no exit fade
+  const splash = skipSplash ? null : (
     <AnimatePresence>{showSplash && <Splash key="splash" />}</AnimatePresence>
   );
 
