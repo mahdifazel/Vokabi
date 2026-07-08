@@ -38,8 +38,24 @@ export function AppShell({ children }: { children: ReactNode }) {
     !splashDone || (gated && (!authReady || (!user && !isLogin)));
 
   useEffect(() => {
+    // full cinematic intro only once per session; on reloads (e.g. Android
+    // restoring the app after a tab/app switch) dismiss almost immediately
+    let played = false;
+    try {
+      played = sessionStorage.getItem("vokabi.splashPlayed") === "1";
+    } catch {
+      // storage unavailable — treat as first play
+    }
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const t = setTimeout(() => setSplashDone(true), reduce ? 700 : 2700);
+    const delay = played ? 150 : reduce ? 700 : 2700;
+    const t = setTimeout(() => {
+      setSplashDone(true);
+      try {
+        sessionStorage.setItem("vokabi.splashPlayed", "1");
+      } catch {
+        // ignore
+      }
+    }, delay);
     return () => clearTimeout(t);
   }, []);
 
