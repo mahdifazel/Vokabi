@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import { BookOpen, FolderOpen, GraduationCap, Heart, Settings } from "lucide-react";
+import { GraduationCap, Library, Settings } from "lucide-react";
 import { cn } from "./ui";
 import { initVoices } from "@/lib/tts";
 import { applyTheme, getSettings } from "@/lib/settings";
@@ -16,10 +16,8 @@ import { Splash } from "./splash";
 import { AnnouncementBanner } from "./announcement-banner";
 
 const TABS = [
-  { href: "/", label: "Words", icon: BookOpen },
-  { href: "/groups", label: "Groups", icon: FolderOpen },
+  { href: "/", label: "Library", icon: Library },
   { href: "/learn", label: "Learn", icon: GraduationCap },
-  { href: "/favorites", label: "Favorites", icon: Heart },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
