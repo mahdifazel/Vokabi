@@ -27,7 +27,7 @@ export function MiniPlayer() {
           transition={{ type: "spring", damping: 28, stiffness: 320 }}
           className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 mx-auto max-w-lg"
         >
-          <div className="relative rounded-3xl border border-border bg-surface px-5 py-6 shadow-xl">
+          <div className="relative rounded-3xl border border-border bg-surface px-5 pb-7 pt-8 shadow-xl">
             <button
               onClick={stopPlayer}
               aria-label="Stop playback"
@@ -49,7 +49,7 @@ export function MiniPlayer() {
                 {player.title} · {player.index + 1}/{player.words.length}
               </p>
             </div>
-            <div className="mt-4 flex items-center justify-center gap-3">
+            <div className="mt-7 flex items-center justify-center gap-3">
               <button
                 onClick={prevWord}
                 aria-label="Previous word"
