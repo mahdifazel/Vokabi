@@ -35,7 +35,7 @@ const themeScript = `
 (function () {
   try {
     var s = JSON.parse(localStorage.getItem("vokabi.settings") || "{}");
-    var t = s.theme || "system";
+    var t = s.theme || "dark";
     var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     if (dark) document.documentElement.classList.add("dark");
   } catch (e) {}

@@ -81,7 +81,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   readTranslation: false,
   autoRepeat: false,
   shuffle: false,
-  theme: "system",
+  theme: "dark",
   germanVoice: "",
 };
 

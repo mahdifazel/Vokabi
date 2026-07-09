@@ -47,6 +47,9 @@ export function getGermanVoices(): SpeechSynthesisVoice[] {
 function voiceScore(v: SpeechSynthesisVoice): number {
   const name = v.name.toLowerCase();
   let score = 0;
+  // Apple's "Anna" is the preferred default on iOS/macOS; the enhanced
+  // variant still wins over the compact one via the hints below
+  if (/\banna\b/.test(name)) score += 200;
   QUALITY_HINTS.forEach((hint, i) => {
     if (name.includes(hint)) score += 100 - i * 10;
   });
