@@ -19,6 +19,7 @@ import { playWordOnce, wordSpokenText } from "@/lib/player";
 import { speak } from "@/lib/tts";
 import { getSettings } from "@/lib/settings";
 import { PracticeSheet } from "@/components/practice-sheet";
+import { VerbDetails } from "@/components/verb-details";
 import { Button, Card, Input, Sheet, Textarea, cn } from "@/components/ui";
 
 const ARTICLES: (Article | "")[] = ["", "der", "die", "das"];
@@ -198,8 +199,8 @@ export default function WordDetailPage({
         </div>
       </div>
 
-      {/* Example */}
-      {(word.example || word.exampleEn) && (
+      {/* Example (verbs show it in the verb section below Groups instead) */}
+      {word.pos !== "verb" && (word.example || word.exampleEn) && (
         <Card className="mb-3 p-4">
           <p className="mb-1 text-xs font-extrabold tracking-wide text-muted uppercase">
             Example
@@ -244,6 +245,9 @@ export default function WordDetailPage({
           </div>
         )}
       </Card>
+
+      {/* Verb details: example, Perfekt, conjugation, grammar */}
+      {word.pos === "verb" && <VerbDetails word={word} />}
 
       {/* Delete */}
       {!confirmDelete ? (
