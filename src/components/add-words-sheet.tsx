@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check, ClipboardPaste, Loader2 } from "lucide-react";
 import { db } from "@/lib/db";
@@ -28,26 +28,6 @@ export function AddWordsSheet({
   const [done, setDone] = useState(0);
   const groupsQuery = useLiveQuery(() => db.groups.orderBy("name").toArray(), []);
   const groups = groupsQuery ?? EMPTY_GROUPS;
-  const preselected = useRef(false);
-
-  // a single group is the only possible target → select it without showing the picker;
-  // with several groups the user must pick at least one themselves
-  useEffect(() => {
-    if (!open) {
-      preselected.current = false;
-      return;
-    }
-    if (preselected.current || defaultGroupId != null) return;
-    const only = groups.length === 1 ? groups[0] : undefined;
-    if (only?.id != null) {
-      preselected.current = true;
-      const t = setTimeout(
-        () => setSelectedGroups((sel) => (sel.length === 0 ? [only.id!] : sel)),
-        0
-      );
-      return () => clearTimeout(t);
-    }
-  }, [open, groups, defaultGroupId]);
 
   const count = splitWordList(text).length;
 
@@ -137,7 +117,8 @@ export function AddWordsSheet({
       <Button
         className="mt-5 w-full"
         size="lg"
-        disabled={count === 0 || busy || (groups.length > 0 && selectedGroups.length === 0)}
+        // with a single group there is no picker — addWordsFromText targets it automatically
+        disabled={count === 0 || busy || (groups.length > 1 && selectedGroups.length === 0)}
         onClick={handleAdd}
       >
         {busy ? (

@@ -4,12 +4,23 @@ import { scheduleSync } from "./sync";
 import type { Word } from "./types";
 
 /**
+ * When the caller didn't pick any groups and exactly one group exists,
+ * that group is the only sensible destination — target it automatically.
+ */
+async function resolveTargetGroups(groupIds: number[]): Promise<number[]> {
+  if (groupIds.length > 0) return groupIds;
+  const groups = await db.groups.toArray();
+  return groups.length === 1 && groups[0].id != null ? [groups[0].id] : [];
+}
+
+/**
  * Add words from pasted text. Inserts rows immediately (status "pending"),
  * then enriches them from the dictionary in the background so the UI stays fast.
  */
 export async function addWordsFromText(text: string, groupIds: number[] = []): Promise<number[]> {
   const inputs = splitWordList(text);
   if (inputs.length === 0) return [];
+  groupIds = await resolveTargetGroups(groupIds);
 
   const now = Date.now();
   const fresh: { input: ParsedInput; word: Word }[] = [];
@@ -220,6 +231,7 @@ export function parseCSV(text: string): string[][] {
 export async function importFromDelimited(text: string, groupIds: number[] = []): Promise<number> {
   const rows = parseCSV(text);
   if (rows.length === 0) return 0;
+  groupIds = await resolveTargetGroups(groupIds);
 
   let start = 0;
   const first = rows[0].map((c) => c.trim().toLowerCase());
