@@ -22,11 +22,12 @@ Until automated coverage exists, changes are verified against the affected flows
 - [ ] Bulk paste with mixed forms (`der Baum`, lowercase noun, a verb) → parsed, deduplicated, enriched
 - [ ] Add an obscure word offline → status "no translation found"; Settings → *Retry lookups* fixes it once online
 - [ ] Edit a word manually; delete a word
+- [ ] Open a verb (e.g. "gehen", "aufstehen", "sich freuen") → example with playback, Perfekt with sein/haben chip, collapsible conjugation and grammar sections; nouns/adjectives show none of these
 
 **Audio** (needs a real Android phone for full confidence)
 - [ ] Single-word play; slow play on word detail
 - [ ] Group playback honoring speed / pause / repeat / read-article / read-translation / shuffle / auto-repeat
-- [ ] Mini-player prev/pause/next/stop
+- [ ] Player card: current word shown large with translation, prev/pause/next centered, close top-right
 - [ ] Screen off during playback → audio continues; lock-screen controls show current word and work
 
 **Learning**
@@ -60,6 +61,7 @@ If/when tests are added, the natural fit for this codebase:
    - `lib/dictionary.ts` — `parseInput`, `splitWordList`, wikitext parsing (`parseGermanWikitext`, `parseDeNounTemplate` — fixture-friendly), plural resolution, umlaut stems
    - `lib/speech.ts` — `scoreAttempt`, `levenshtein`, `charMatches`
    - `lib/learn.ts` — `buildQuiz` option/correctness invariants
+   - `lib/verbs.ts` — `getVerbInfo` conjugation/Perfekt against a table of known-good verbs (pure functions, ideal fixture target)
    - `lib/words.ts` — `parseCSV`, `wordsToCSV` round-trip
    - Dexie-dependent code can run against `fake-indexeddb`
 2. **Component/integration tests** — React Testing Library for the add-words flow and settings toggles

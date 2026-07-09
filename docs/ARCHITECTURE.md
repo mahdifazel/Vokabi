@@ -93,7 +93,15 @@ startPlaylist(words, title)
 - The splash plays fully once per session (`sessionStorage`), and on reloads is removed pre-paint (layout effect) so navigation never flashes it
 - `/admin` bypasses the shell entirely — it has its own layout and server-verified guard
 
-### 5. Admin (src/app/api/admin/*, lib/admin/server.ts)
+### 5. Verb details (lib/verbs.ts)
+
+The word detail screen shows verb-specific sections (example sentence, Perfekt, present conjugation, grammar) for words with `pos: "verb"`. Everything is **computed at render time on-device** — nothing is stored or synced:
+
+- A rule-based conjugator handles any infinitive: stem endings (`arbeitest`), sibilant stems (`du heißt`), `-eln` verbs (`ich sammle`), separable prefixes (`ich stehe auf`), reflexives (`ich freue mich`), and Perfekt derivation (ge-/no-ge, `-ieren`, inseparable prefixes) with sein/haben auxiliaries
+- A curated table (~100 common A1–B1 verbs) supplies irregular forms, strong participles, natural example sentences, required prepositions/cases, and language levels
+- Verbs outside the table still get a full conjugation and Perfekt, but no example/level unless the user adds one
+
+### 6. Admin (src/app/api/admin/*, lib/admin/server.ts)
 
 Every route handler calls `requireAdmin(req)`:
 bearer token from the client session → verified via service-role `auth.getUser(token)` → email checked against `ADMIN_EMAILS`. Returns 501 when unconfigured, 401/403 on failures. The service-role client bypasses RLS, which is exactly why it exists only in server code. The client (`lib/admin/client.ts` → `adminFetch`) attaches the session token to every call.
@@ -106,6 +114,7 @@ Summarized here; rationale in `docs/DECISIONS.md`:
 - UUID (`uid`) identity for sync; local auto-increment ids never leave the device
 - Hand-written service worker; `/api/` never cached (auth-dependent)
 - Web Speech API (no TTS backend, no API keys, offline-capable voices)
+- Verb conjugation computed on-device (rules + curated table), never stored or synced
 - Module-store state via `useSyncExternalStore` instead of a state library
 - Hand-rolled UI primitives in the shadcn idiom instead of the Radix dependency tree
 - Admin authorization via env-var allowlist instead of a roles table

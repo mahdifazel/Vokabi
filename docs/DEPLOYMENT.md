@@ -12,6 +12,8 @@
 
 **Deploy = `git push`.** Every push to `main` triggers a Vercel production build and release. There is no CI gate — run `npm run lint && npm run build` locally before pushing (see `CONTRIBUTING.md`).
 
+**Branch workflow:** day-to-day changes are committed to the `dev` branch and reviewed on localhost; `dev` is merged into `main` only after approval, which is what ships to production.
+
 ## Staging
 
 ⚠️ **There is no dedicated staging environment.** What exists today:
@@ -47,7 +49,7 @@
 ## Operational gotchas
 
 - **Env var changes require a redeploy** — `NEXT_PUBLIC_*` values are inlined at build time. Vercel: Deployments → ⋯ → Redeploy
-- **Clients cache aggressively** — the service worker updates on a two-visit cycle: users may need to fully close and reopen the app twice after a release. If you change cached static assets or SW logic, bump `CACHE` in `public/sw.js` (currently `vokabi-v5`)
+- **Clients cache aggressively** — the service worker updates on a two-visit cycle: users may need to fully close and reopen the app twice after a release. If you change cached static assets or SW logic, bump `CACHE` in `public/sw.js` (currently `vokabi-v6`)
 - **Database schema changes** are applied manually: re-run the updated SQL file in the Supabase SQL Editor. The files are written idempotently; there is no migration tooling or history table
 - **Local production test**: `npm run build && npm start` (the SW only registers in production mode)
 - **Rollback**: Vercel → Deployments → pick a previous deployment → *Promote to Production*. Note this does not roll back Supabase schema changes

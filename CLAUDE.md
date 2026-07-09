@@ -6,7 +6,7 @@ Guidance for AI assistants and new developers working in this repository.
 
 ## Project overview
 
-**Vokabi** is a mobile-first Progressive Web App for learning German vocabulary, live at **https://vokabi.app**. Users paste words (single or bulk), the app enriches them automatically with article (der/die/das), English translation, plural, IPA, and part of speech, then trains them through native TTS playback (with lock-screen media controls that keep playing while the screen is off), pronunciation practice via speech recognition, flashcards, and quizzes. Data is offline-first (IndexedDB) and syncs per-user to Supabase. An admin back office lives at `/admin`.
+**Vokabi** is a mobile-first Progressive Web App for learning German vocabulary, live at **https://vokabi.app**. Users paste words (single or bulk), the app enriches them automatically with article (der/die/das), English translation, plural, IPA, and part of speech, then trains them through native TTS playback (with lock-screen media controls that keep playing while the screen is off), pronunciation practice via speech recognition, flashcards, and quizzes. Verbs additionally get an on-device conjugation/Perfekt/grammar breakdown (`lib/verbs.ts`). Data is offline-first (IndexedDB) and syncs per-user to Supabase. An admin back office lives at `/admin`.
 
 ## Tech stack
 
@@ -33,6 +33,10 @@ npm run lint       # ESLint (eslint-config-next core-web-vitals + typescript)
 ```
 
 There is **no test suite** (see `docs/TESTING.md`). Verification = `npm run lint` + `npm run build` + manual checks.
+
+## Branch workflow
+
+**Never commit directly to `main`** — every push to `main` auto-deploys to production. All changes go to the `dev` branch first, get reviewed on localhost (`npm run dev`), and are merged into `main` only after explicit approval.
 
 ## Environment variables
 
@@ -66,7 +70,7 @@ src/
     groups/page.tsx        Redirect → / (legacy route)
     favorites/             Favorites list
     learn/                 Learn hub, flashcards/, quiz/
-    word/[id]/             Word detail (edit, practice, groups, delete)
+    word/[id]/             Word detail (edit, practice, groups, delete; verb sections for verbs)
     login/                 Standalone auth screen (no shell chrome)
     settings/              Audio/theme/data/account/feedback
     admin/                 Back office UI (own layout + guard)
@@ -76,8 +80,8 @@ src/
     icon.svg               Favicon (Next.js file convention)
   components/
     app-shell.tsx          Bottom nav, auth gate, splash orchestration, SW registration
-    ui.tsx                 Primitives: Button, Card, Input, Switch, Segmented, Sheet…
-    …                      Feature components (word-row, mini-player, splash, …)
+    ui.tsx                 Primitives: Button, Card, Input, Switch, Segmented, Sheet, Collapsible…
+    …                      Feature components (word-row, mini-player, verb-details, splash, …)
   lib/
     types.ts               All shared types + article color maps
     db.ts                  Dexie schema v2, mutation hooks (uid/dirty), remote-write guard
@@ -90,6 +94,7 @@ src/
     tts.ts / speech.ts     Speech synthesis / recognition scoring
     keepalive.ts           Silent-audio loop for background playback
     learn.ts               Learn sources + quiz question builder
+    verbs.ts               Verb engine: present conjugation, Perfekt + sein/haben, grammar data
     settings.ts            localStorage settings store + theme application
     admin/server.ts        requireAdmin + service client (server only)
     admin/client.ts        adminFetch + admin row types
@@ -104,12 +109,12 @@ docs/                       Architecture, decisions, deployment, testing
 
 - **State stores**: module-level state + `useSyncExternalStore` (see `settings.ts`, `player.ts`, `auth.ts`, `sync.ts`). No Redux/Zustand.
 - **DB access**: components read via `useLiveQuery`; writes go through helpers in `words.ts` where side effects (outbox tombstones, sync scheduling) matter. Never mark rows dirty when applying remote data — wrap in `withRemoteWrites()`.
-- **Styling**: Tailwind utility classes referencing semantic tokens (`bg-surface`, `text-muted`, `bg-primary-soft`…) defined in `globals.css`. Dark mode = `.dark` class on `<html>` (set by inline script pre-hydration + `settings.ts`). Never hardcode hex in components.
+- **Styling**: Tailwind utility classes referencing semantic tokens (`bg-surface`, `text-muted`, `bg-primary-soft`…) defined in `globals.css`. Dark mode = `.dark` class on `<html>` (set by inline script pre-hydration + `settings.ts`); **dark is the default** for users without saved settings. Never hardcode hex in components.
 - **Client vs server**: everything under `src/app` (except `api/`) is client components (`"use client"`). Only `api/admin/*` and `lib/admin/server.ts` run on the server.
 - **ESLint is strict about React**: no synchronous `setState` in effect bodies (use timers/microtasks or restructure), no ref reads during render. `npm run lint` must be clean before committing.
 - **Copy style**: user-facing text is friendly, concise, sentence case ("Add your first words", "Got it").
 - **Word data**: `favorite` is `0 | 1` (Dexie can't index booleans). `groupIds` is a multiEntry index. German nouns are auto-capitalized in `buildWord`.
-- After changing cached assets or fixing SW behavior, **bump `CACHE` in `public/sw.js`** (currently `vokabi-v5`) or clients keep the old version.
+- After changing cached assets or fixing SW behavior, **bump `CACHE` in `public/sw.js`** (currently `vokabi-v6`) or clients keep the old version.
 
 ## Gotchas
 

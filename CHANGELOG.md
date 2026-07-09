@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [1.1.0] — 2026-07-09
+
+### Added
+
+- **Verb details on the word screen** — for words tagged as verbs: a natural example sentence with English translation and TTS playback, the Perfekt form with its sein/haben auxiliary, a collapsible present-tense conjugation table (ich/du/er·sie·es/wir/ihr/sie·Sie), and a collapsible grammar section (verb type, required preposition, required case, language level). Powered by a new on-device verb engine (`lib/verbs.ts`): rule-based conjugation for any infinitive (separable prefixes, reflexives, stem rules) plus curated data for ~100 common A1–B1 verbs
+- `Collapsible` accordion primitive in `components/ui.tsx`
+
+### Changed
+
+- **Player redesign** — the mini-player is now a full card: the word being read is shown large and fully wrapped (no truncation) with its English translation beneath, controls are centered below it, and the close button sits top-right
+- **Simpler groups UX** — the "All words" card is hidden when only one group exists; the add-words sheet skips the group picker with a single group (auto-assigns) and requires at least one selected group when there are several
+- **Anna is the preferred German voice on iOS/macOS** (auto-pick and voice list ordering)
+- **Dark mode is the default theme** for first-time users (previously followed the system)
+- Service worker cache bumped to `vokabi-v6`
+
 ## [1.0.0] — 2026-07-09
 
 Initial release at [vokabi.app](https://vokabi.app).
@@ -63,5 +78,6 @@ Initial release at [vokabi.app](https://vokabi.app).
 - Service worker excludes `/api/` from caching so per-user admin responses can never leak between accounts on a shared device
 - Admin authorization enforced server-side on every request (bearer token verification + allowlist)
 
-[Unreleased]: https://github.com/mahdifazel/Vokabi/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/mahdifazel/Vokabi/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/mahdifazel/Vokabi/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/mahdifazel/Vokabi/releases/tag/v1.0.0

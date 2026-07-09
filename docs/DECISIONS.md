@@ -77,5 +77,11 @@ Why Vokabi is built the way it is. Each entry: context → decision → trade-of
 ## 13. Default "General" group, seeded after first sync
 
 **Context:** First-time users adding words with no groups yet would create invisible/orphaned-feeling words; the user explicitly wanted a default group.
-**Decision:** After a successful pull (cloud mode) or on first launch (local mode), if zero groups exist, create "General"; the add-words sheet preselects it when no group is chosen.
-**Trade-offs:** Seeding *after* the pull avoids duplicate "General" groups across devices. Name matching is by literal "general" for preselection — renaming it disables that convenience.
+**Decision:** After a successful pull (cloud mode) or on first launch (local mode), if zero groups exist, create "General". The add-words sheet hides the group picker entirely when only one group exists (words are auto-assigned to it); with several groups the user must select at least one. Likewise the Library hides the "All words" card while there's only one group, since it would duplicate it.
+**Trade-offs:** Seeding *after* the pull avoids duplicate "General" groups across devices. Requiring an explicit selection with multiple groups adds one tap but prevents words landing in an unintended default.
+
+## 14. Verb details computed on-device (no verb API, nothing stored)
+
+**Context:** The verb screen needs present conjugation, Perfekt with sein/haben, examples, and grammar facts — with no paid API, offline, and without touching the sync schema.
+**Decision:** `lib/verbs.ts` derives everything at render time: a rule-based conjugator covers any infinitive (stem/sibilant/-eln rules, separable prefixes, reflexives, Perfekt formation), and a curated table of ~100 common A1–B1 verbs supplies irregular forms, example sentences, prepositions/cases, and levels. Results are never persisted or synced.
+**Trade-offs:** Zero latency, fully offline, no DB/schema changes, and fixes to the engine instantly apply to every word. Uncommon verbs get correct-by-rule conjugation but no example or level (the user can add an example via Edit); truly exotic irregulars outside the table would need a table entry. Rejected: storing verb data per word (sync/schema churn, stale data) and calling a conjugation API (cost, latency, offline gap).

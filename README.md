@@ -8,8 +8,9 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 
 - **Bulk word adding** — paste one word or a whole list; `das Haus`-style articles are detected automatically
 - **Automatic dictionary** — article (🔵 der / 🔴 die / 🟢 das), English translation, plural, IPA, and part of speech via a bundled ~300-word offline seed dictionary → Wiktionary → translation-API fallback, cached in IndexedDB
-- **Native pronunciation** — best available German system voice (Google natural voices on Android), voice picker, 0.5–1.5× speed, slow-play button
-- **Listening playlists** — play a group with configurable pause (0–5 s), repeat count (1–5×), read-article and read-translation toggles, shuffle, endless loop; floating mini-player
+- **Native pronunciation** — best available German system voice (Google natural voices on Android, Anna on iOS), voice picker, 0.5–1.5× speed, slow-play button
+- **Listening playlists** — play a group with configurable pause (0–5 s), repeat count (1–5×), read-article and read-translation toggles, shuffle, endless loop; a floating player card shows the current word in large type with its translation and centered controls
+- **Verb details** — verbs get an example sentence (with playback), the Perfekt with its sein/haben auxiliary, a collapsible present-tense conjugation table, and grammar details (verb type, preposition, case, level)
 - **Screen-off playback** — audio keeps playing when the phone is locked, with lock-screen media controls (current word, play/pause/next/prev)
 - **Pronunciation practice** — speak the word, get *Excellent / Good / Needs improvement* with mistake letters highlighted (speech recognition)
 - **Flashcards** — 3D flip cards, swipe right = got it / left = still learning, retry-missed rounds
@@ -17,7 +18,7 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 - **Organization** — groups (with a default **General** group), favorites, instant global search, word details with examples and notes
 - **Import / export** — TXT/CSV import, CSV/JSON export
 - **Accounts & sync** — email/password login (Supabase); words sync across devices, protected by Postgres row-level security; offline-first so everything works without a connection
-- **PWA** — installable on Android, offline service worker, dark/light/system theme, cinematic once-per-session splash
+- **PWA** — installable on Android, offline service worker, dark (default)/light/system theme, cinematic once-per-session splash
 - **Admin back office** (`/admin`) — user management (ban/delete/reset password), feedback inbox, announcement banners, email broadcast
 
 ## Prerequisites
