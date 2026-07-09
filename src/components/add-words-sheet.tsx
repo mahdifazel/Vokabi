@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Camera, Check, ClipboardPaste, Loader2, X } from "lucide-react";
 import { db } from "@/lib/db";
@@ -9,8 +9,11 @@ import { splitWordList } from "@/lib/dictionary";
 import { ocrSupported, recognizeGermanLines, type OcrProgress } from "@/lib/ocr";
 import type { Group } from "@/lib/types";
 import { Button, Sheet, Textarea, cn } from "./ui";
+import { CameraCapture } from "./camera-capture";
 
 const EMPTY_GROUPS: Group[] = [];
+// draft survives page reloads (iOS can kill the PWA while a picker is open)
+const DRAFT_KEY = "vokabi.addWordsDraft";
 
 export function AddWordsSheet({
   open,
@@ -29,7 +32,30 @@ export function AddWordsSheet({
   const [done, setDone] = useState(0);
   const [scanState, setScanState] = useState<OcrProgress | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // restore a draft after a reload; deferred so it is not a sync set in the effect
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        const draft = sessionStorage.getItem(DRAFT_KEY);
+        if (draft) setText((cur) => cur || draft);
+      } catch {
+        // storage unavailable, nothing to restore
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (text) sessionStorage.setItem(DRAFT_KEY, text);
+      else sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // storage full or unavailable, draft just won't survive a reload
+    }
+  }, [text]);
   const groupsQuery = useLiveQuery(() => db.groups.orderBy("name").toArray(), []);
   const groups = groupsQuery ?? EMPTY_GROUPS;
 
@@ -57,11 +83,11 @@ export function AddWordsSheet({
     }
   }
 
-  async function handleScanFile(file: File) {
+  async function handleScan(source: File | HTMLCanvasElement) {
     setScanError(null);
     setScanState({ phase: "preparing" });
     try {
-      const lines = await recognizeGermanLines(file, setScanState);
+      const lines = await recognizeGermanLines(source, setScanState);
       if (lines.length === 0) {
         setScanError("No words found in that photo. Try a sharper, closer picture.");
       } else if (lines.length > 20) {
@@ -114,7 +140,14 @@ export function AddWordsSheet({
           </button>
           {ocrSupported() && (
             <button
-              onClick={() => fileRef.current?.click()}
+              onClick={() => {
+                // in-app camera; the system camera app can get the PWA killed
+                if (typeof navigator.mediaDevices?.getUserMedia === "function") {
+                  setCameraOpen(true);
+                } else {
+                  fileRef.current?.click();
+                }
+              }}
               disabled={scanState != null}
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary active:opacity-70 disabled:opacity-50"
             >
@@ -153,7 +186,6 @@ export function AddWordsSheet({
           </div>
         )}
       </div>
-      {/* no capture attribute: iOS and Android then offer both camera and gallery */}
       <input
         ref={fileRef}
         type="file"
@@ -161,9 +193,22 @@ export function AddWordsSheet({
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) void handleScanFile(file);
+          if (file) void handleScan(file);
         }}
       />
+      {cameraOpen && (
+        <CameraCapture
+          onClose={() => setCameraOpen(false)}
+          onCapture={(frame) => {
+            setCameraOpen(false);
+            void handleScan(frame);
+          }}
+          onPickGallery={() => {
+            setCameraOpen(false);
+            fileRef.current?.click();
+          }}
+        />
+      )}
       {scanError && (
         <p className="mt-2 text-sm font-semibold text-destructive">{scanError}</p>
       )}

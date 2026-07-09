@@ -67,21 +67,29 @@ async function getWorker(): Promise<Worker> {
   return workerPromise;
 }
 
-/** Decode the photo and draw it downscaled onto a canvas. */
-async function downscaleImage(file: File): Promise<HTMLCanvasElement> {
-  const url = URL.createObjectURL(file);
+function scaleToMax(source: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
+  const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas unavailable");
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/** Decode the photo (or take the captured frame) downscaled onto a canvas. */
+async function toRecognizableCanvas(source: File | HTMLCanvasElement): Promise<HTMLCanvasElement> {
+  if (source instanceof HTMLCanvasElement) {
+    if (Math.max(source.width, source.height) <= MAX_DIMENSION) return source;
+    return scaleToMax(source, source.width, source.height);
+  }
+  const url = URL.createObjectURL(source);
   try {
     const img = new Image();
     img.src = url;
     await img.decode();
-    const scale = Math.min(1, MAX_DIMENSION / Math.max(img.naturalWidth, img.naturalHeight));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("canvas unavailable");
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas;
+    return scaleToMax(img, img.naturalWidth, img.naturalHeight);
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -113,19 +121,20 @@ function cleanupLines(lines: { text: string; confidence: number }[]): string[] {
 }
 
 /**
- * Recognize German text in a photo and return cleaned candidate lines,
- * one entry per printed line (a full sentence stays a single entry).
- * Throws when recognition itself fails (asset download, decode error).
+ * Recognize German text in a photo (picked file or captured camera frame)
+ * and return cleaned candidate lines, one entry per printed line (a full
+ * sentence stays a single entry). Throws when recognition itself fails
+ * (asset download, decode error).
  */
 export async function recognizeGermanLines(
-  file: File,
+  source: File | HTMLCanvasElement,
   onProgress?: (p: OcrProgress) => void
 ): Promise<string[]> {
   const run = async (): Promise<string[]> => {
     progressCb = onProgress ?? null;
     try {
       onProgress?.({ phase: "preparing" });
-      const canvas = await downscaleImage(file);
+      const canvas = await toRecognizableCanvas(source);
       const worker = await getWorker();
       const { data } = await worker.recognize(canvas, {}, { blocks: true, text: false });
       const rawLines = (data.blocks ?? [])
