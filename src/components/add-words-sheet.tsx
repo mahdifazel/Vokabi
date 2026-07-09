@@ -30,18 +30,19 @@ export function AddWordsSheet({
   const groups = groupsQuery ?? EMPTY_GROUPS;
   const preselected = useRef(false);
 
-  // no explicit target group → default to "General" so first-time words land somewhere
+  // a single group is the only possible target → select it without showing the picker;
+  // with several groups the user must pick at least one themselves
   useEffect(() => {
     if (!open) {
       preselected.current = false;
       return;
     }
     if (preselected.current || defaultGroupId != null) return;
-    const general = groups.find((g) => g.name.toLowerCase() === "general");
-    if (general?.id != null) {
+    const only = groups.length === 1 ? groups[0] : undefined;
+    if (only?.id != null) {
       preselected.current = true;
       const t = setTimeout(
-        () => setSelectedGroups((sel) => (sel.length === 0 ? [general.id!] : sel)),
+        () => setSelectedGroups((sel) => (sel.length === 0 ? [only.id!] : sel)),
         0
       );
       return () => clearTimeout(t);
@@ -107,7 +108,7 @@ export function AddWordsSheet({
         )}
       </div>
 
-      {groups.length > 0 && (
+      {groups.length > 1 && (
         <div className="mt-4">
           <p className="mb-2 text-sm font-extrabold">Add to groups</p>
           <div className="flex flex-wrap gap-2">
@@ -127,13 +128,16 @@ export function AddWordsSheet({
               </button>
             ))}
           </div>
+          {selectedGroups.length === 0 && (
+            <p className="mt-2 text-xs font-semibold text-muted">Select at least one group</p>
+          )}
         </div>
       )}
 
       <Button
         className="mt-5 w-full"
         size="lg"
-        disabled={count === 0 || busy}
+        disabled={count === 0 || busy || (groups.length > 0 && selectedGroups.length === 0)}
         onClick={handleAdd}
       >
         {busy ? (

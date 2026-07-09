@@ -112,21 +112,23 @@ export default function LibraryPage() {
         />
       ) : (
         <div className="flex flex-col gap-2.5">
-          {/* All words */}
-          <Link href="/all" className="cursor-pointer">
-            <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-                <BookOpen size={20} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-extrabold">All words</p>
-                <p className="text-sm font-semibold text-muted">
-                  {words?.length ?? 0} word{(words?.length ?? 0) === 1 ? "" : "s"}
-                </p>
-              </div>
-              <ChevronRight size={18} className="text-muted" />
-            </Card>
-          </Link>
+          {/* All words — redundant when there's only one group */}
+          {(groups?.length ?? 0) > 1 && (
+            <Link href="/all" className="cursor-pointer">
+              <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+                  <BookOpen size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-extrabold">All words</p>
+                  <p className="text-sm font-semibold text-muted">
+                    {words?.length ?? 0} word{(words?.length ?? 0) === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <ChevronRight size={18} className="text-muted" />
+              </Card>
+            </Link>
+          )}
 
           {/* Favorites */}
           {favCount > 0 && (
