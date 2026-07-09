@@ -27,19 +27,29 @@ export function MiniPlayer() {
           transition={{ type: "spring", damping: 28, stiffness: 320 }}
           className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 mx-auto max-w-lg"
         >
-          <div className="rounded-3xl border border-border bg-surface p-4 shadow-xl">
-            <div className="text-center">
-              <p className="break-words text-2xl font-extrabold leading-snug">
+          <div className="relative rounded-3xl border border-border bg-surface px-5 py-6 shadow-xl">
+            <button
+              onClick={stopPlayer}
+              aria-label="Stop playback"
+              className="absolute right-3 top-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-muted active:scale-95 active:text-foreground"
+            >
+              <X size={18} />
+            </button>
+            <div className="px-8 text-center">
+              <p className="break-words text-3xl font-extrabold leading-snug">
                 {word.article && (
                   <span className={cn("mr-1.5", ARTICLE_COLORS[word.article])}>{word.article}</span>
                 )}
                 {word.german}
               </p>
-              <p className="mt-1 text-xs font-semibold text-muted">
+              {word.english && (
+                <p className="mt-1 break-words text-sm font-semibold text-muted">{word.english}</p>
+              )}
+              <p className="mt-1.5 text-xs font-semibold text-muted">
                 {player.title} · {player.index + 1}/{player.words.length}
               </p>
             </div>
-            <div className="mt-3 flex items-center justify-center gap-2">
+            <div className="mt-4 flex items-center justify-center gap-3">
               <button
                 onClick={prevWord}
                 aria-label="Previous word"
@@ -60,13 +70,6 @@ export function MiniPlayer() {
                 className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-muted active:scale-95 active:text-foreground"
               >
                 <SkipForward size={18} />
-              </button>
-              <button
-                onClick={stopPlayer}
-                aria-label="Stop playback"
-                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-muted active:scale-95 active:text-foreground"
-              >
-                <X size={18} />
               </button>
             </div>
           </div>
