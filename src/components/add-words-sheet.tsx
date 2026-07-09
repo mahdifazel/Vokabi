@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Check, ClipboardPaste, Loader2 } from "lucide-react";
+import { Camera, Check, ClipboardPaste, Loader2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { addWordsFromText } from "@/lib/words";
 import { splitWordList } from "@/lib/dictionary";
+import { ocrSupported, recognizeGermanLines, type OcrProgress } from "@/lib/ocr";
 import type { Group } from "@/lib/types";
 import { Button, Sheet, Textarea, cn } from "./ui";
 
@@ -26,6 +27,9 @@ export function AddWordsSheet({
   );
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
+  const [scanState, setScanState] = useState<OcrProgress | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const groupsQuery = useLiveQuery(() => db.groups.orderBy("name").toArray(), []);
   const groups = groupsQuery ?? EMPTY_GROUPS;
 
@@ -53,6 +57,29 @@ export function AddWordsSheet({
     }
   }
 
+  async function handleScanFile(file: File) {
+    setScanError(null);
+    setScanState({ phase: "preparing" });
+    try {
+      const lines = await recognizeGermanLines(file, setScanState);
+      if (lines.length === 0) {
+        setScanError("No words found in that photo. Try a sharper, closer picture.");
+      } else if (lines.length > 20) {
+        setScanError(
+          "Your image contains more than 20 words or sentences. Please take a new picture with fewer items."
+        );
+      } else {
+        setText((t) => (t ? t + "\n" + lines.join("\n") : lines.join("\n")));
+      }
+    } catch {
+      setScanError("Could not read that photo. Please try again.");
+    } finally {
+      setScanState(null);
+      // allow picking the same photo again
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   function toggleGroup(id: number) {
     setSelectedGroups((g) => (g.includes(id) ? g.filter((x) => x !== id) : [...g, id]));
   }
@@ -66,7 +93,10 @@ export function AddWordsSheet({
       <Textarea
         rows={6}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          setScanError(null);
+        }}
         placeholder={"Haus\nBaum\nAuto\nFenster"}
         autoFocus
         lang="de"
@@ -75,18 +105,54 @@ export function AddWordsSheet({
         spellCheck={false}
       />
       <div className="mt-2 flex items-center justify-between">
-        <button
-          onClick={handlePasteFromClipboard}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary active:opacity-70"
-        >
-          <ClipboardPaste size={16} /> Paste from clipboard
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handlePasteFromClipboard}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary active:opacity-70"
+          >
+            <ClipboardPaste size={16} /> Paste
+          </button>
+          {ocrSupported() && (
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={scanState != null}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary active:opacity-70 disabled:opacity-50"
+            >
+              {scanState != null ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  {scanState.phase === "recognizing"
+                    ? `Reading photo ${Math.round(scanState.progress * 100)}%`
+                    : "Preparing scanner"}
+                </>
+              ) : (
+                <>
+                  <Camera size={16} /> Scan a photo
+                </>
+              )}
+            </button>
+          )}
+        </div>
         {count > 0 && (
           <span className="text-sm font-bold text-muted">
             {count} word{count === 1 ? "" : "s"}
           </span>
         )}
       </div>
+      {/* no capture attribute: iOS and Android then offer both camera and gallery */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleScanFile(file);
+        }}
+      />
+      {scanError && (
+        <p className="mt-2 text-sm font-semibold text-destructive">{scanError}</p>
+      )}
 
       {groups.length > 1 && (
         <div className="mt-4">

@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# OCR runtime assets, copied from node_modules on postinstall
+/public/ocr/
+
 # production
 /build
 
