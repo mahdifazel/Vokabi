@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Camera, Check, ClipboardPaste, Loader2 } from "lucide-react";
+import { Camera, Check, ClipboardPaste, Loader2, X } from "lucide-react";
 import { db } from "@/lib/db";
 import { addWordsFromText } from "@/lib/words";
 import { splitWordList } from "@/lib/dictionary";
@@ -133,10 +133,24 @@ export function AddWordsSheet({
             </button>
           )}
         </div>
-        {count > 0 && (
-          <span className="text-sm font-bold text-muted">
-            {count} word{count === 1 ? "" : "s"}
-          </span>
+        {text.length > 0 && (
+          <div className="flex items-center gap-1">
+            {count > 0 && (
+              <span className="text-sm font-bold text-muted">
+                {count} word{count === 1 ? "" : "s"}
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setText("");
+                setScanError(null);
+              }}
+              aria-label="Clear text"
+              className="inline-flex cursor-pointer items-center rounded-xl p-1.5 text-muted active:opacity-70"
+            >
+              <X size={18} />
+            </button>
+          </div>
         )}
       </div>
       {/* no capture attribute: iOS and Android then offer both camera and gallery */}
