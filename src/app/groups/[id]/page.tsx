@@ -160,7 +160,7 @@ export default function GroupDetailPage({
           ) : (
             <div className="rounded-2xl bg-destructive/10 p-4">
               <p className="mb-3 text-sm font-bold text-destructive">
-                Delete “{group?.name}”? Words stay in your library — only the group is removed.
+                Delete “{group?.name}”? Words stay in your library. Only the group is removed.
               </p>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(false)}>

@@ -27,7 +27,7 @@ export function FeedbackCard() {
     });
     setBusy(false);
     if (err) {
-      setError("Couldn't send right now — please try again later.");
+      setError("Couldn't send right now. Please try again later.");
       return;
     }
     setMessage("");
@@ -45,7 +45,7 @@ export function FeedbackCard() {
           rows={3}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Found a bug? Missing a feature? Tell me — it lands directly in my inbox."
+          placeholder="Found a bug? Missing a feature? Tell me. It lands directly in my inbox."
         />
         <Button
           size="sm"
@@ -57,7 +57,7 @@ export function FeedbackCard() {
             <Loader2 size={16} className="animate-spin" />
           ) : done ? (
             <>
-              <Check size={16} /> Sent — thank you!
+              <Check size={16} /> Sent, thank you!
             </>
           ) : (
             <>

@@ -32,7 +32,7 @@ export default function AdminEmailPage() {
       });
       setNotice(
         `Sent to ${res.sent} recipient${res.sent === 1 ? "" : "s"}` +
-          (res.failures.length ? ` — ${res.failures.length} batch(es) failed` : "")
+          (res.failures.length ? `, ${res.failures.length} batch(es) failed` : "")
       );
       setSubject("");
       setBody("");
@@ -71,7 +71,7 @@ export default function AdminEmailPage() {
             rows={8}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder={"Hallo!\n\nPlain text — blank lines become paragraphs."}
+            placeholder={"Hallo!\n\nPlain text. Blank lines become paragraphs."}
           />
         </label>
         <div className="mt-4 flex flex-wrap items-center gap-2">

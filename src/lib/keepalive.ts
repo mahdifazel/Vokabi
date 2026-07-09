@@ -4,7 +4,7 @@
  * Background-playback keep-alive.
  *
  * Android suspends pages (and their speech synthesis + timers) when the
- * screen turns off — unless the tab is audibly playing media. We loop a
+ * screen turns off, unless the tab is audibly playing media. We loop a
  * near-silent WAV at minimal volume while a playlist runs, which keeps the
  * page alive exactly like a music player, and gives the Media Session API
  * a real media element to attach lock-screen controls to.
@@ -51,7 +51,7 @@ export function startKeepAlive() {
     audio.volume = 0.02; // inaudible, but registers as playing audio
   }
   void audio.play().catch(() => {
-    // autoplay blocked — playback was not user-initiated; speech still works
+    // autoplay blocked, playback was not user-initiated; speech still works
     // in the foreground, it just won't survive the screen turning off
   });
 }

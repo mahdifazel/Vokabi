@@ -4,7 +4,7 @@ import { useId } from "react";
 
 /**
  * The Vokabi mark: a speech bubble whose tail sits on the axis of the
- * negative-space V — the bubble "speaks" the letter.
+ * negative-space V, the bubble "speaks" the letter.
  */
 export function VokabiLogo({
   size = 40,

@@ -73,7 +73,7 @@ export default function AdminAnnouncementsPage() {
         <EmptyState
           icon={<Megaphone size={28} />}
           title="No announcements"
-          hint="Publish one above — active announcements appear as a banner in the app."
+          hint="Publish one above. Active announcements appear as a banner in the app."
         />
       ) : (
         <div className="flex flex-col gap-2">

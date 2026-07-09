@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     try {
       played = sessionStorage.getItem("vokabi.splashPlayed") === "1";
     } catch {
-      // storage unavailable — treat as first play
+      // storage unavailable, treat as first play
     }
     if (played) {
       // already played this session (reload, tab/app switch restore):
@@ -91,7 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // skipSplash bypasses AnimatePresence entirely — no mount, no exit fade
+  // skipSplash bypasses AnimatePresence entirely, no mount, no exit fade
   const splash = skipSplash ? null : (
     <AnimatePresence>{showSplash && <Splash key="splash" />}</AnimatePresence>
   );
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  // login screen stands alone — no bottom nav, no player
+  // login screen stands alone, no bottom nav, no player
   if (isLogin) {
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
@@ -111,7 +111,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  // session restoring / redirect in flight — the splash overlay covers this
+  // session restoring / redirect in flight, the splash overlay covers this
   if (gated && (!authReady || !user)) {
     return <div className="min-h-dvh">{splash}</div>;
   }

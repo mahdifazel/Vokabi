@@ -45,7 +45,7 @@ export default function FavoritesPage() {
         <EmptyState
           icon={<Heart size={28} />}
           title="No favorites yet"
-          hint="Tap the heart on any word to collect it here — favorites work like their own group."
+          hint="Tap the heart on any word to collect it here. Favorites work like their own group."
         />
       ) : (
         <div className="flex flex-col gap-2.5">

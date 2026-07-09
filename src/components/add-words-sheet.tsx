@@ -49,7 +49,7 @@ export function AddWordsSheet({
       const clip = await navigator.clipboard.readText();
       if (clip) setText((t) => (t ? t + "\n" + clip : clip));
     } catch {
-      // clipboard permission denied — user can paste manually
+      // clipboard permission denied, user can paste manually
     }
   }
 
@@ -60,7 +60,7 @@ export function AddWordsSheet({
   return (
     <Sheet open={open} onClose={onClose} title="Add words">
       <p className="mb-3 text-sm font-semibold text-muted">
-        Paste one word or a whole list — one per line. Articles like “das Haus” are detected;
+        Paste one word or a whole list, one per line. Articles like “das Haus” are detected;
         translations are added automatically.
       </p>
       <Textarea
@@ -117,7 +117,7 @@ export function AddWordsSheet({
       <Button
         className="mt-5 w-full"
         size="lg"
-        // with a single group there is no picker — addWordsFromText targets it automatically
+        // with a single group there is no picker, addWordsFromText targets it automatically
         disabled={count === 0 || busy || (groups.length > 1 && selectedGroups.length === 0)}
         onClick={handleAdd}
       >

@@ -31,7 +31,7 @@ export function updateSettings(patch: Partial<AppSettings>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
   } catch {
-    // storage full or unavailable — keep in-memory value
+    // storage full or unavailable, keep in-memory value
   }
   applyTheme(cached.theme);
   listeners.forEach((l) => l());

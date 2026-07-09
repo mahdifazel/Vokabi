@@ -45,7 +45,7 @@ function registerMediaHandlers() {
     ms.setActionHandler("previoustrack", () => prevWord());
     ms.setActionHandler("stop", () => stopPlayer());
   } catch {
-    // some handlers unsupported on this platform — fine
+    // some handlers unsupported on this platform, fine
   }
 }
 

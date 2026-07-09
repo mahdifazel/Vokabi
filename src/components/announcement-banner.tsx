@@ -24,7 +24,7 @@ export function AnnouncementBanner() {
     try {
       dismissed = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "[]");
     } catch {
-      // corrupted — treat as none dismissed
+      // corrupted, treat as none dismissed
     }
     supabase
       .from("announcements")
@@ -42,7 +42,7 @@ export function AnnouncementBanner() {
       const dismissed: string[] = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "[]");
       localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissed, id].slice(-50)));
     } catch {
-      // storage unavailable — banner just reappears next visit
+      // storage unavailable, banner just reappears next visit
     }
   }
 

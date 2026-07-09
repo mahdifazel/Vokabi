@@ -17,7 +17,7 @@ import { Button, Sheet, cn } from "./ui";
 
 const RATING_META = {
   excellent: { label: "Excellent!", color: "text-accent", bg: "bg-accent-soft" },
-  good: { label: "Good — almost there", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-500/15" },
+  good: { label: "Good, almost there", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-500/15" },
   "needs-improvement": {
     label: "Needs improvement",
     color: "text-destructive",
@@ -67,12 +67,12 @@ function PracticeBody({ word }: { word: Word }) {
       const code = e instanceof Error ? e.message : "unknown";
       setError(
         code === "no-speech"
-          ? "I didn't hear anything — try again and speak clearly."
+          ? "I didn't hear anything. Try again and speak clearly."
           : code === "not-allowed" || code === "service-not-allowed"
             ? "Microphone access was denied. Allow it in your browser settings."
             : code === "not-supported"
               ? "Speech recognition isn't supported in this browser."
-              : "Something went wrong — please try again."
+              : "Something went wrong. Please try again."
       );
     } finally {
       setListening(false);

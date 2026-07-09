@@ -126,7 +126,7 @@ function QuizContent() {
           </p>
           <p className="mt-2 text-lg font-extrabold">
             {score} of {questions.length} correct
-            {score === questions.length ? " — perfect! 🎉" : ""}
+            {score === questions.length ? ", perfect! 🎉" : ""}
           </p>
           {misses.length > 0 && (
             <div className="mt-6 w-full max-w-sm rounded-2xl bg-surface-2 p-4 text-left">

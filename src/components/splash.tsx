@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { VokabiLogo } from "./logo";
 
-/** Signature easing — fast attack, long elegant settle (Apple-style) */
+/** Signature easing, fast attack, long elegant settle (Apple-style) */
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /** Deterministic particle field (no Math.random → SSR-safe, no hydration drift) */
@@ -40,7 +40,7 @@ export function Splash() {
         }}
       />
 
-      {/* drifting aurora blobs — transform-only, GPU-friendly */}
+      {/* drifting aurora blobs, transform-only, GPU-friendly */}
       {!reduce && (
         <>
           <motion.div

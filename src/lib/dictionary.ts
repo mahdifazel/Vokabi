@@ -139,7 +139,7 @@ export function buildWord(
 }
 
 // ---------------------------------------------------------------------------
-// Wiktionary (en.wiktionary.org) — one request gives gender, plural, IPA,
+// Wiktionary (en.wiktionary.org): one request gives gender, plural, IPA,
 // part of speech and English definitions for German entries.
 // ---------------------------------------------------------------------------
 
@@ -182,7 +182,7 @@ async function fetchFromWiktionary(word: string): Promise<DictEntry | null> {
       const entry = parseGermanWikitext(data.parse.title ?? title, wikitext);
       if (entry) return entry;
     } catch {
-      // network error / timeout — try next candidate
+      // network error / timeout, try next candidate
     }
   }
   return null;
@@ -329,7 +329,7 @@ function umlautStem(word: string): string | undefined {
 }
 
 // ---------------------------------------------------------------------------
-// MyMemory — free translation fallback when Wiktionary has no entry
+// MyMemory: free translation fallback when Wiktionary has no entry
 // ---------------------------------------------------------------------------
 
 async function fetchTranslation(word: string): Promise<string | null> {

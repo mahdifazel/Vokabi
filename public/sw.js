@@ -1,5 +1,5 @@
-/* Vokabi service worker — offline-first app shell */
-const CACHE = "vokabi-v6";
+/* Vokabi service worker, offline-first app shell */
+const CACHE = "vokabi-v7";
 const OFFLINE_URLS = ["/", "/learn", "/settings", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -23,7 +23,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   // Never intercept cross-origin requests (dictionary/translation APIs)
   if (url.origin !== self.location.origin) return;
-  // Never cache API responses — they are per-user and auth-dependent
+  // Never cache API responses, they are per-user and auth-dependent
   if (url.pathname.startsWith("/api/")) return;
 
   // Navigations: network first, fall back to cached shell

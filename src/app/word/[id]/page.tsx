@@ -152,7 +152,7 @@ export default function WordDetailPage({
         )}
         <h1 className="text-4xl font-black tracking-tight">{word.german}</h1>
         {word.ipa && <p className="mt-1 text-base font-semibold text-muted">{word.ipa}</p>}
-        <p className="mt-2 text-xl font-bold text-muted">{word.english ?? "—"}</p>
+        <p className="mt-2 text-xl font-bold text-muted">{word.english ?? "-"}</p>
         {(word.plural || word.pos) && (
           <p className="mt-1 text-sm font-semibold text-muted">
             {word.pos}
@@ -223,7 +223,7 @@ export default function WordDetailPage({
         <p className="mb-2 text-xs font-extrabold tracking-wide text-muted uppercase">Groups</p>
         {groups.length === 0 ? (
           <p className="text-sm font-semibold text-muted">
-            No groups yet — create one in the Groups tab.
+            No groups yet. Create one in the Groups tab.
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">

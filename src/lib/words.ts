@@ -5,7 +5,7 @@ import type { Word } from "./types";
 
 /**
  * When the caller didn't pick any groups and exactly one group exists,
- * that group is the only sensible destination — target it automatically.
+ * that group is the only sensible destination, target it automatically.
  */
 async function resolveTargetGroups(groupIds: number[]): Promise<number[]> {
   if (groupIds.length > 0) return groupIds;

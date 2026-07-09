@@ -193,7 +193,7 @@ export default function AdminUserDetailPage({
                     {w.article ? `${w.article} ` : ""}
                     {w.german}
                   </span>
-                  <span className="truncate font-semibold text-muted">{w.english ?? "—"}</span>
+                  <span className="truncate font-semibold text-muted">{w.english ?? "-"}</span>
                 </li>
               ))}
             </ul>

@@ -103,7 +103,7 @@ export default function LibraryPage() {
         <EmptyState
           icon={<BookOpen size={28} />}
           title="No words yet"
-          hint="Paste a single word or a whole vocabulary list — Vokabi finds articles and translations for you."
+          hint="Paste a single word or a whole vocabulary list. Vokabi finds articles and translations for you."
           action={
             <Button onClick={() => setAddOpen(true)}>
               <Plus size={18} /> Add your first words
@@ -112,7 +112,7 @@ export default function LibraryPage() {
         />
       ) : (
         <div className="flex flex-col gap-2.5">
-          {/* All words — redundant when there's only one group */}
+          {/* All words, redundant when there's only one group */}
           {(groups?.length ?? 0) > 1 && (
             <Link href="/all" className="cursor-pointer">
               <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 /**
  * Server-side admin helpers. These run only in API route handlers and use the
- * Supabase service-role key, which bypasses row-level security — it must never
+ * Supabase service-role key, which bypasses row-level security; it must never
  * reach the client. Admin access is an email allowlist in ADMIN_EMAILS.
  */
 

@@ -56,7 +56,7 @@ export default function LearnPage() {
         <EmptyState
           icon={<GraduationCap size={28} />}
           title="Nothing to practice yet"
-          hint="Add some words first — then train them here with flashcards and quizzes."
+          hint="Add some words first, then train them here with flashcards and quizzes."
         />
       </div>
     );
@@ -118,7 +118,7 @@ export default function LearnPage() {
             <div className="flex-1">
               <p className="text-lg font-extrabold">Quiz</p>
               <p className="text-sm font-semibold text-muted">
-                Multiple choice — translations and der/die/das
+                Multiple choice: translations and der/die/das
               </p>
             </div>
           </Card>

@@ -10,7 +10,7 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Vokabi — German Vocabulary Trainer",
+  title: "Vokabi - German Vocabulary Trainer",
   description:
     "Learn German words with native pronunciation, practice speaking, and organize your vocabulary.",
   manifest: "/manifest.webmanifest",

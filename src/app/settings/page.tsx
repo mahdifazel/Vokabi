@@ -58,7 +58,7 @@ export default function SettingsPage() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   useEffect(() => {
-    // voices load asynchronously on Android — refresh once they arrive
+    // voices load asynchronously on Android, refresh once they arrive
     const synth = window.speechSynthesis;
     if (!synth) return;
     const update = () => setVoices(getGermanVoices());
