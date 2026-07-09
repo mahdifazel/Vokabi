@@ -70,7 +70,7 @@ export default function LearnPage() {
       </header>
 
       <p className="mb-2 text-sm font-extrabold">What do you want to practice?</p>
-      <div className="mb-5 flex flex-wrap gap-2">
+      <div className="no-scrollbar -mx-4 mb-5 flex gap-2 overflow-x-auto px-4">
         {chips.map((c) => (
           <button
             key={c.label}
@@ -78,7 +78,7 @@ export default function LearnPage() {
             disabled={c.count === 0}
             aria-pressed={isSelected(c.src)}
             className={cn(
-              "cursor-pointer rounded-full px-4 py-2 text-sm font-bold transition-all active:scale-95 disabled:opacity-40",
+              "shrink-0 cursor-pointer whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold transition-all active:scale-95 disabled:opacity-40",
               isSelected(c.src) ? "bg-primary text-on-primary" : "bg-surface-2 text-muted"
             )}
           >

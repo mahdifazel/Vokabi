@@ -65,6 +65,14 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* Horizontal chip rows scroll without a visible scrollbar */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Range slider styling */
 input[type="range"] {
   height: 0.5rem;
