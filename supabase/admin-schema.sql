@@ -27,3 +27,14 @@ create policy "submit own feedback" on public.feedback
 -- signed-in users see active announcements; only the service role writes them
 create policy "read active announcements" on public.announcements
   for select using (auth.role() = 'authenticated' and active);
+
+-- server-side key/value configuration (e.g. AI provider API keys).
+-- RLS is enabled with no policies on purpose: only the service role
+-- (admin API routes) can read or write these rows.
+create table if not exists public.app_settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.app_settings enable row level security;

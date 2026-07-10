@@ -114,7 +114,7 @@ docs/                       Architecture, decisions, deployment, testing
 - **ESLint is strict about React**: no synchronous `setState` in effect bodies (use timers/microtasks or restructure), no ref reads during render. `npm run lint` must be clean before committing.
 - **Copy style**: user-facing text is friendly, concise, sentence case ("Add your first words", "Got it").
 - **Word data**: `favorite` is `0 | 1` (Dexie can't index booleans). `groupIds` is a multiEntry index. German nouns are auto-capitalized in `buildWord`.
-- After changing cached assets or fixing SW behavior, **bump `CACHE` in `public/sw.js`** (currently `vokabi-v6`) or clients keep the old version.
+- After changing cached assets or fixing SW behavior, **bump `CACHE` in `public/sw.js`** (currently `vokabi-v8`) or clients keep the old version.
 
 ## Gotchas
 

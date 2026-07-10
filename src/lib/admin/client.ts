@@ -49,3 +49,9 @@ export interface AdminAnnouncementRow {
   active: boolean;
   created_at: string;
 }
+
+export interface AdminGroqSettings {
+  configured: boolean;
+  keyHint: string | null;
+  model: string;
+}
