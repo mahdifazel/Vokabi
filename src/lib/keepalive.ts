@@ -140,6 +140,12 @@ export function startKeepAlive() {
   });
 }
 
+/** One-line status for diagnostics: is the loop really rolling? */
+export function keepAliveStatus(): string {
+  if (!audio) return "none";
+  return `${audio.paused ? "paused" : "playing"} ct=${audio.currentTime.toFixed(1)} vol=${audio.volume}${audio.muted ? " muted" : ""}`;
+}
+
 export function pauseKeepAlive() {
   intentionalPause = true;
   setSessionType("auto");

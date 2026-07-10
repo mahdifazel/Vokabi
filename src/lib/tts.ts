@@ -107,13 +107,50 @@ function armVisibilityNudge() {
   });
 }
 
-/** Speak text; resolves when finished, cancelled, or given up on. Never rejects. */
-export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
-  if (!ttsSupported() || !text.trim()) return Promise.resolve();
+// bumped by stopSpeaking so background retry loops know they were cancelled
+let cancelCount = 0;
+
+function pageHidden() {
+  return typeof document !== "undefined" && document.visibilityState === "hidden";
+}
+
+function delay(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms));
+}
+
+/**
+ * Speak text; resolves when finished, cancelled, or given up on. Never
+ * rejects. While the page is hidden, "interrupted"/"synthesis-failed"
+ * outcomes (Android kills the engine at screen lock) hold the current word
+ * and retry after clearing the engine, instead of advancing: either the
+ * engine unwedges and playback continues, or the word plays on unlock.
+ */
+export async function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
+  if (!ttsSupported() || !text.trim()) return;
   if (!voicesLoaded) initVoices();
   armVisibilityNudge();
-  const synth = window.speechSynthesis;
+  const gen = cancelCount;
+  for (;;) {
+    const outcome = await speakAttempt(text, opts);
+    if (gen !== cancelCount) return; // cancelled by the player, not a failure
+    if (pageHidden() && (outcome === "synthesis-failed" || outcome === "interrupted")) {
+      diag(`hold word, retry after ${outcome} [hidden]`);
+      try {
+        window.speechSynthesis.cancel(); // clear a possibly wedged engine
+      } catch {
+        // ignore
+      }
+      await delay(1500);
+      if (gen !== cancelCount) return;
+      continue;
+    }
+    return;
+  }
+}
 
+/** One utterance attempt; resolves "ok" or the utterance error code. */
+function speakAttempt(text: string, opts: SpeakOptions): Promise<string> {
+  const synth = window.speechSynthesis;
   diag(`speak "${text.slice(0, 24)}"${hiddenFlag()}`);
   return new Promise((resolve) => {
     const u = new SpeechSynthesisUtterance(text);
@@ -129,11 +166,11 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     let activeMs = 0;
     let totalMs = 0;
 
-    const finish = () => {
+    const finish = (outcome: string) => {
       if (done) return;
       done = true;
       clearInterval(watchdog);
-      resolve();
+      resolve(outcome);
     };
 
     u.onstart = () => {
@@ -142,11 +179,11 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     };
     u.onend = () => {
       diag(`utterance ended${hiddenFlag()}`);
-      finish();
+      finish("ok");
     };
     u.onerror = (e) => {
       diag(`utterance error: ${e.error}${hiddenFlag()}`);
-      finish();
+      finish(e.error || "error");
     };
 
     // Watchdog: if the utterance never starts (Android drops utterances queued
@@ -160,7 +197,7 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
       if (done) return;
       totalMs += 250;
       if (totalMs >= ABSOLUTE_TIMEOUT_MS) {
-        finish();
+        finish("ok");
         return;
       }
       const lockedBeforeStart =
@@ -171,7 +208,7 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
         activeMs += 250;
         if (activeMs >= HARD_TIMEOUT_MS) {
           diag(`watchdog hard timeout (started=${started})${hiddenFlag()}`);
-          finish();
+          finish("ok");
           return;
         }
       }
@@ -190,11 +227,11 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
             synth.speak(u);
           } catch {
             diag(`watchdog re-queue threw${hiddenFlag()}`);
-            if (!lockedBeforeStart) finish();
+            if (!lockedBeforeStart) finish("ok");
           }
         } else {
           diag(`watchdog gave up${hiddenFlag()}`);
-          finish();
+          finish("ok");
         }
       }
     }, 250);
@@ -203,12 +240,13 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
       synth.resume(); // Android Chrome sometimes wakes up paused
       synth.speak(u);
     } catch {
-      finish();
+      finish("ok");
     }
   });
 }
 
 export function stopSpeaking() {
+  cancelCount++;
   if (ttsSupported()) {
     try {
       window.speechSynthesis.cancel();

@@ -4,8 +4,25 @@ import { useSyncExternalStore } from "react";
 import type { Word } from "./types";
 import { getSettings } from "./settings";
 import { speak, stopSpeaking } from "./tts";
-import { pauseKeepAlive, startKeepAlive, stopKeepAlive } from "./keepalive";
-import { diag } from "./diag";
+import { keepAliveStatus, pauseKeepAlive, startKeepAlive, stopKeepAlive } from "./keepalive";
+import { diag, hiddenFlag } from "./diag";
+
+// diagnostics heartbeat: proves whether timers run and the keep-alive rolls
+let heartbeat: ReturnType<typeof setInterval> | null = null;
+
+function startHeartbeat() {
+  if (heartbeat != null) return;
+  heartbeat = setInterval(() => {
+    diag(`hb ${keepAliveStatus()}${hiddenFlag()}`);
+  }, 5000);
+}
+
+function stopHeartbeat() {
+  if (heartbeat != null) {
+    clearInterval(heartbeat);
+    heartbeat = null;
+  }
+}
 
 export interface PlayerState {
   words: Word[];
@@ -126,6 +143,7 @@ export function startPlaylist(words: Word[], title: string, startIndex = 0) {
   stopSpeaking();
   diag(`playlist start: ${list.length} words`);
   startKeepAlive(); // keeps playback alive when the screen turns off
+  startHeartbeat();
   registerMediaHandlers();
   setState({ words: list, index: startIndex, playing: true, title, active: true });
   void runLoop(generation);
@@ -192,6 +210,7 @@ export function stopPlayer() {
   generation++;
   stopSpeaking();
   stopKeepAlive();
+  stopHeartbeat();
   setState({ ...IDLE });
 }
 
