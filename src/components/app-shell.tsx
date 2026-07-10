@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { GraduationCap, Library, Settings } from "lucide-react";
-import { cn } from "./ui";
+import { InteractiveMenu } from "./interactive-menu";
 import { initVoices } from "@/lib/tts";
 import { applyTheme, getSettings } from "@/lib/settings";
 import { initAuth, useAuthReady, useUser } from "@/lib/auth";
@@ -121,42 +120,21 @@ export function AppShell({ children }: { children: ReactNode }) {
       <AnnouncementBanner />
       <main className="flex-1 pb-40">{children}</main>
       <MiniPlayer />
-      <nav
-        aria-label="Main navigation"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 backdrop-blur-lg pb-[env(safe-area-inset-bottom)]"
-      >
-        <div className="mx-auto flex h-16 w-full max-w-lg items-stretch md:max-w-2xl lg:max-w-3xl">
-          {TABS.map(({ href, label, icon: Icon }) => {
-            const active =
-              href === "/"
-                ? pathname === "/" || pathname.startsWith("/word")
-                : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 transition-colors duration-150",
-                  active ? "text-primary" : "text-muted active:text-foreground"
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex h-7 w-13 items-center justify-center rounded-full transition-colors duration-150",
-                    active && "bg-primary-soft"
-                  )}
-                >
-                  <Icon size={21} strokeWidth={active ? 2.5 : 2} />
-                </span>
-                <span className={cn("text-[11px]", active ? "font-extrabold" : "font-semibold")}>
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 backdrop-blur-lg pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-3xl">
+          <InteractiveMenu
+            items={TABS}
+            activeIndex={Math.max(
+              0,
+              TABS.findIndex(({ href }) =>
+                href === "/"
+                  ? pathname === "/" || pathname.startsWith("/word")
+                  : pathname.startsWith(href)
+              )
+            )}
+          />
         </div>
-      </nav>
+      </div>
       {splash}
     </div>
   );
