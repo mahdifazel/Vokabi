@@ -12,23 +12,52 @@
  * iOS additionally needs the audio session marked as "playback"
  * (navigator.audioSession, Safari 16.4+); without it the system treats the
  * page's audio as expendable and pauses it on screen lock or when the
- * ring/silent switch is on. iOS may still pause the element on lock, so an
- * unexpected "pause" restarts playback unless we paused on purpose.
+ * ring/silent switch is on.
+ *
+ * IMPORTANT: all of that must happen only while the page is hidden. In the
+ * foreground the OS briefly pauses our loop whenever speech starts (audio
+ * ducking); restarting it then, or holding a "playback" session, steals the
+ * audio output from the speech engine and mutes the pronunciation after a
+ * couple of words. Foreground playback needs no help, so we leave it alone.
  */
 
 let audio: HTMLAudioElement | null = null;
 let objectUrl: string | null = null;
 let intentionalPause = false;
+let listenersAttached = false;
 
-/** Mark this page's audio as media playback so iOS keeps it running when locked. */
-function requestPlaybackSession() {
+function setSessionType(type: "auto" | "playback") {
   try {
     const session = (navigator as Navigator & { audioSession?: { type: string } })
       .audioSession;
-    if (session) session.type = "playback";
+    if (session) session.type = type;
   } catch {
     // older browsers without the Audio Session API
   }
+}
+
+function attachBackgroundListeners() {
+  if (listenersAttached || typeof document === "undefined" || !audio) return;
+  listenersAttached = true;
+  // a system pause while hidden freezes the page and kills the playlist;
+  // a system pause while visible is speech ducking and must be respected
+  audio.addEventListener("pause", () => {
+    if (intentionalPause || document.visibilityState !== "hidden") return;
+    setTimeout(() => {
+      if (!intentionalPause && document.visibilityState === "hidden") {
+        void audio?.play().catch(() => {});
+      }
+    }, 250);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (intentionalPause) return;
+    if (document.visibilityState === "hidden") {
+      setSessionType("playback");
+      if (audio?.paused) void audio.play().catch(() => {});
+    } else {
+      setSessionType("auto");
+    }
+  });
 }
 
 /** Build a 10s near-silent 8-bit mono WAV (±1 LSB ticks so it counts as audible). */
@@ -63,19 +92,11 @@ function silentWavUrl(): string {
 
 export function startKeepAlive() {
   if (typeof Audio === "undefined") return;
-  requestPlaybackSession();
   if (!audio) {
     audio = new Audio(silentWavUrl());
     audio.loop = true;
     audio.volume = 0.02; // inaudible, but registers as playing audio
-    audio.addEventListener("pause", () => {
-      // the system paused us (screen lock, interruption): restart shortly,
-      // otherwise timers freeze and the playlist dies with the screen
-      if (intentionalPause) return;
-      setTimeout(() => {
-        if (!intentionalPause) void audio?.play().catch(() => {});
-      }, 250);
-    });
+    attachBackgroundListeners();
   }
   intentionalPause = false;
   void audio.play().catch(() => {
@@ -86,11 +107,13 @@ export function startKeepAlive() {
 
 export function pauseKeepAlive() {
   intentionalPause = true;
+  setSessionType("auto");
   audio?.pause();
 }
 
 export function stopKeepAlive() {
   intentionalPause = true;
+  setSessionType("auto");
   if (audio) {
     audio.pause();
     audio.currentTime = 0;
