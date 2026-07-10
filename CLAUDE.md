@@ -57,7 +57,7 @@ Database schema is applied **manually** in the Supabase SQL Editor: run `supabas
 
 ## Architecture in one paragraph
 
-The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing → MyMemory translation fallback. Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist). See `docs/ARCHITECTURE.md` for the full picture.
+The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing → MyMemory translation fallback. Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist) and `/api/ai/*` (signed-in users; calls Groq with the key stored in `app_settings`, and the client falls back to on-device heuristics when it fails). See `docs/ARCHITECTURE.md` for the full picture.
 
 ## Directory structure
 
@@ -75,6 +75,7 @@ src/
     settings/              Audio/theme/data/account/feedback
     admin/                 Back office UI (own layout + guard)
     api/admin/             Server route handlers (service-role)
+    api/ai/                AI routes for signed-in users (Groq word extraction)
     layout.tsx             Root layout: fonts, theme script, AppShell
     globals.css            Tailwind v4 theme tokens (light + .dark)
     icon.svg               Favicon (Next.js file convention)
@@ -110,11 +111,11 @@ docs/                       Architecture, decisions, deployment, testing
 - **State stores**: module-level state + `useSyncExternalStore` (see `settings.ts`, `player.ts`, `auth.ts`, `sync.ts`). No Redux/Zustand.
 - **DB access**: components read via `useLiveQuery`; writes go through helpers in `words.ts` where side effects (outbox tombstones, sync scheduling) matter. Never mark rows dirty when applying remote data — wrap in `withRemoteWrites()`.
 - **Styling**: Tailwind utility classes referencing semantic tokens (`bg-surface`, `text-muted`, `bg-primary-soft`…) defined in `globals.css`. Dark mode = `.dark` class on `<html>` (set by inline script pre-hydration + `settings.ts`); **dark is the default** for users without saved settings. Never hardcode hex in components.
-- **Client vs server**: everything under `src/app` (except `api/`) is client components (`"use client"`). Only `api/admin/*` and `lib/admin/server.ts` run on the server.
+- **Client vs server**: everything under `src/app` (except `api/`) is client components (`"use client"`). Only `api/admin/*`, `api/ai/*` and `lib/admin/server.ts` run on the server.
 - **ESLint is strict about React**: no synchronous `setState` in effect bodies (use timers/microtasks or restructure), no ref reads during render. `npm run lint` must be clean before committing.
 - **Copy style**: user-facing text is friendly, concise, sentence case ("Add your first words", "Got it").
 - **Word data**: `favorite` is `0 | 1` (Dexie can't index booleans). `groupIds` is a multiEntry index. German nouns are auto-capitalized in `buildWord`.
-- After changing cached assets or fixing SW behavior, **bump `CACHE` in `public/sw.js`** (currently `vokabi-v8`) or clients keep the old version.
+- After changing cached assets or fixing SW behavior, **bump `CACHE` in `public/sw.js`** (currently `vokabi-v9`) or clients keep the old version.
 
 ## Gotchas
 

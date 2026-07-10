@@ -23,7 +23,15 @@ import type { Worker } from "tesseract.js";
 
 export type OcrProgress =
   | { phase: "preparing" }
-  | { phase: "recognizing"; progress: number };
+  | { phase: "recognizing"; progress: number }
+  | { phase: "analyzing" };
+
+export interface OcrResult {
+  /** Every recognized line as-is, for AI analysis. */
+  rawText: string;
+  /** Heuristically cleaned candidate lines, the non-AI fallback. */
+  lines: string[];
+}
 
 const MAX_DIMENSION = 1600;
 const MIN_LINE_CONFIDENCE = 40;
@@ -32,7 +40,7 @@ const MIN_LETTER_RATIO = 0.5;
 
 let workerPromise: Promise<Worker> | null = null;
 let progressCb: ((p: OcrProgress) => void) | null = null;
-let inFlight: Promise<string[]> = Promise.resolve([]);
+let inFlight: Promise<OcrResult> = Promise.resolve({ rawText: "", lines: [] });
 
 export function ocrSupported(): boolean {
   return (
@@ -121,16 +129,17 @@ function cleanupLines(lines: { text: string; confidence: number }[]): string[] {
 }
 
 /**
- * Recognize German text in a photo (picked file or captured camera frame)
- * and return cleaned candidate lines, one entry per printed line (a full
- * sentence stays a single entry). Throws when recognition itself fails
+ * Recognize German text in a photo (picked file or captured camera frame).
+ * Returns the raw recognized text (for AI analysis) plus cleaned candidate
+ * lines, one entry per printed line (a full sentence stays a single entry),
+ * used when AI is unavailable. Throws when recognition itself fails
  * (asset download, decode error).
  */
-export async function recognizeGermanLines(
+export async function recognizeGerman(
   source: File | HTMLCanvasElement,
   onProgress?: (p: OcrProgress) => void
-): Promise<string[]> {
-  const run = async (): Promise<string[]> => {
+): Promise<OcrResult> {
+  const run = async (): Promise<OcrResult> => {
     progressCb = onProgress ?? null;
     try {
       onProgress?.({ phase: "preparing" });
@@ -141,13 +150,17 @@ export async function recognizeGermanLines(
         .flatMap((b) => b.paragraphs)
         .flatMap((p) => p.lines)
         .map((l) => ({ text: l.text, confidence: l.confidence }));
-      return cleanupLines(rawLines);
+      const rawText = rawLines
+        .map((l) => l.text.trim())
+        .filter(Boolean)
+        .join("\n");
+      return { rawText, lines: cleanupLines(rawLines) };
     } finally {
       progressCb = null;
     }
   };
   // serialize scans; a previous failure must not block the next one
-  const result = inFlight.catch(() => []).then(run);
+  const result = inFlight.catch(() => ({ rawText: "", lines: [] })).then(run);
   inFlight = result;
   return result;
 }

@@ -6,7 +6,8 @@ import { Camera, Check, ClipboardPaste, Loader2, X } from "lucide-react";
 import { db } from "@/lib/db";
 import { addWordsFromText } from "@/lib/words";
 import { splitWordList } from "@/lib/dictionary";
-import { ocrSupported, recognizeGermanLines, type OcrProgress } from "@/lib/ocr";
+import { ocrSupported, recognizeGerman, type OcrProgress } from "@/lib/ocr";
+import { extractWordsWithAi } from "@/lib/ai";
 import type { Group } from "@/lib/types";
 import { Button, Sheet, Textarea, cn } from "./ui";
 import { CameraCapture } from "./camera-capture";
@@ -87,15 +88,24 @@ export function AddWordsSheet({
     setScanError(null);
     setScanState({ phase: "preparing" });
     try {
-      const lines = await recognizeGermanLines(source, setScanState);
-      if (lines.length === 0) {
+      const { rawText, lines } = await recognizeGerman(source, setScanState);
+      let words: string[] | null = null;
+      if (rawText) {
+        // AI cleanup via Groq (configured in the back office); null means
+        // unavailable or failed, then the heuristic lines are the fallback
+        setScanState({ phase: "analyzing" });
+        words = await extractWordsWithAi(rawText);
+      }
+      if (!words) words = lines;
+
+      if (words.length === 0) {
         setScanError("No words found in that photo. Try a sharper, closer picture.");
-      } else if (lines.length > 20) {
+      } else if (words.length > 20) {
         setScanError(
           "Your image contains more than 20 words or sentences. Please take a new picture with fewer items."
         );
       } else {
-        setText((t) => (t ? t + "\n" + lines.join("\n") : lines.join("\n")));
+        setText((t) => (t ? t + "\n" + words.join("\n") : words.join("\n")));
       }
     } catch {
       setScanError("Could not read that photo. Please try again.");
@@ -156,7 +166,9 @@ export function AddWordsSheet({
                   <Loader2 size={16} className="animate-spin" />
                   {scanState.phase === "recognizing"
                     ? `Reading photo ${Math.round(scanState.progress * 100)}%`
-                    : "Preparing scanner"}
+                    : scanState.phase === "analyzing"
+                      ? "Identifying words"
+                      : "Preparing scanner"}
                 </>
               ) : (
                 <>
