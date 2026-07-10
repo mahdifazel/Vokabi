@@ -102,6 +102,32 @@ export async function ensureDefaultGroup() {
   }
 }
 
+/**
+ * Self-healing: the library page only shows group cards, so a word without a
+ * group is invisible. Words can end up ungrouped (a deleted group, or a sync
+ * pull whose group references didn't resolve); re-home them to "General"
+ * (or the first group). Runs at startup, after sync pulls and after group
+ * deletion. The updates mark the rows dirty, so the repair syncs back.
+ */
+export async function ensureWordsGrouped() {
+  const orphans = await db.words.filter((w) => !w.groupIds || w.groupIds.length === 0).toArray();
+  if (orphans.length === 0) {
+    await ensureDefaultGroup();
+    return;
+  }
+  await ensureDefaultGroup();
+  const groups = await db.groups.toArray();
+  const target =
+    groups.find((g) => g.name.trim().toLowerCase() === "general") ??
+    [...groups].sort((a, b) => a.name.localeCompare(b.name))[0];
+  if (target?.id == null) return;
+  const now = Date.now();
+  for (const w of orphans) {
+    await db.words.update(w.id!, { groupIds: [target.id], updatedAt: now });
+  }
+  scheduleSync();
+}
+
 /** Retry enrichment for words that previously failed (e.g. added offline) */
 export async function retryPendingLookups() {
   const stale = await db.words.filter((w) => w.status !== "ready").toArray();
@@ -145,6 +171,9 @@ export async function deleteGroupAndDetachWords(groupId: number) {
     if (group?.uid) await db.outbox.add({ table: "groups", uid: group.uid });
     await db.groups.delete(groupId);
   });
+  // words that were only in the deleted group would become invisible on the
+  // library page; re-home them to General instead
+  await ensureWordsGrouped();
   scheduleSync();
 }
 

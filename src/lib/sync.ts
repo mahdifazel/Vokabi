@@ -4,6 +4,8 @@ import { useSyncExternalStore } from "react";
 import { db, onLocalMutation, withRemoteWrites } from "./db";
 import { getSupabase } from "./supabase";
 import { getUser } from "./auth";
+// circular with words.ts (it imports scheduleSync); safe, both only call at runtime
+import { ensureWordsGrouped } from "./words";
 import type { Article, PartOfSpeech, Word, WordStatus } from "./types";
 
 export interface SyncState {
@@ -217,10 +219,10 @@ export async function syncNow(): Promise<void> {
     });
 
     // brand-new account with no groups anywhere → seed the default group
-    // (after the pull, so an existing "General" from another device wins)
-    if ((await db.groups.count()) === 0) {
-      await db.groups.add({ name: "General", createdAt: Date.now() });
-    }
+    // (after the pull, so an existing "General" from another device wins),
+    // and re-home any words whose groups didn't survive the merge so they
+    // stay visible on the library page
+    await ensureWordsGrouped();
 
     const now = Date.now();
     localStorage.setItem(LAST_SYNC_KEY, String(now));

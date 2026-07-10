@@ -11,7 +11,7 @@ import { applyTheme, getSettings } from "@/lib/settings";
 import { initAuth, useAuthReady, useUser } from "@/lib/auth";
 import { cloudConfigured } from "@/lib/supabase";
 import { initSync, syncNow } from "@/lib/sync";
-import { ensureDefaultGroup } from "@/lib/words";
+import { ensureWordsGrouped } from "@/lib/words";
 import { MiniPlayer } from "./mini-player";
 import { Splash } from "./splash";
 import { AnnouncementBanner } from "./announcement-banner";
@@ -77,9 +77,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     initAuth((user) => {
       if (user) void syncNow(); // pull the account's words on login / app start
     });
-    // local-only mode seeds the default group directly; with cloud sync the
-    // seed happens after the first successful pull (see sync.ts)
-    if (!cloudConfigured()) void ensureDefaultGroup();
+    // local-only mode seeds the default group and re-homes ungrouped words
+    // directly; with cloud sync both happen after the pull (see sync.ts)
+    if (!cloudConfigured()) void ensureWordsGrouped();
     // keep "system" theme in sync when OS theme changes
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => applyTheme(getSettings().theme);
