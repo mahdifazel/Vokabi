@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [1.2.0] — 2026-07-10
+
+### Added
+
+- **Photo scan** — add words by pointing the camera at a book page or list (or picking a photo). Recognition runs fully on-device with Tesseract.js (German model, assets served same-origin from `/ocr/`, offline after the first download). An in-app camera is used so Android doesn't kill the PWA while the system camera is open
+- **AI vocabulary identification** — the raw OCR text is analyzed by Groq (Llama 3.3) via the new `/api/ai/extract-words` route: it fixes OCR misreadings, keeps der/die/das articles, keeps sentences intact, and drops noise. When AI is unavailable for any reason (no key, signed out, Groq down, timeout) the app silently falls back to the previous heuristic line detection
+- **Back office redesign** — professional left sidebar on desktop with grouped navigation (Manage / Communication / System), page headers, signed-in admin shown in the footer; sticky top bar with scrollable tabs on mobile
+- **System settings** (`/admin/settings`) — store the Groq API key and model server-side (new `app_settings` table, service-role only, added to `supabase/admin-schema.sql`), with show/hide, test connection, and remove-key actions
+- **Playback diagnostics** — a persistent event log for debugging screen-off audio on real devices, hidden behind 7 taps on the Settings footer
+
+### Changed
+
+- The add-words sheet preselects the first group when opened from the Library page, so the Add button works without an extra tap
+- Deleting a group moves its words to **General** instead of leaving them ungrouped and invisible on the Library page; a self-healing routine (startup, after sync, after group deletion) re-homes any ungrouped words
+- The Android PWA launch screen now uses the dark splash background color instead of light gray, so launching flows straight into the splash
+- Screen-off playback hardening: the audio session is claimed at play time, the keep-alive loop satisfies Chrome's audibility detector, and the current word is held and retried when Android kills TTS at screen lock
+- Service worker cache bumped to `vokabi-v13`
+
+### Fixed
+
+- Words without any group were invisible on the Library page (only reachable via All words and search); they are now automatically placed in General
+
 ## [1.1.0] — 2026-07-09
 
 ### Added
@@ -78,6 +100,7 @@ Initial release at [vokabi.app](https://vokabi.app).
 - Service worker excludes `/api/` from caching so per-user admin responses can never leak between accounts on a shared device
 - Admin authorization enforced server-side on every request (bearer token verification + allowlist)
 
-[Unreleased]: https://github.com/mahdifazel/Vokabi/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/mahdifazel/Vokabi/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/mahdifazel/Vokabi/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mahdifazel/Vokabi/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/mahdifazel/Vokabi/releases/tag/v1.0.0

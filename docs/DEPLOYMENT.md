@@ -9,10 +9,11 @@
 | Database + auth | Supabase (single project) | Also linked via the Vercel↔Supabase integration, which injects the `NEXT_PUBLIC_SUPABASE_*` variables |
 | Email (auth mails) | Supabase built-in mailer | ⚠️ Heavily rate-limited (~a few/hour); "Confirm email" is disabled for this reason. Configure custom SMTP before relying on password-reset emails at scale |
 | Email (broadcasts) | Resend (optional) | Only used by the admin Email tab |
+| AI (photo-scan cleanup) | Groq (optional) | Key is stored in the `app_settings` table and managed at `/admin/settings`, not an env var; scans fall back to heuristics without it |
 
 **Deploy = `git push`.** Every push to `main` triggers a Vercel production build and release. There is no CI gate — run `npm run lint && npm run build` locally before pushing (see `CONTRIBUTING.md`).
 
-**Branch workflow:** day-to-day changes are committed to the `dev` branch and reviewed on localhost; `dev` is merged into `main` only after approval, which is what ships to production.
+**Branch workflow:** day-to-day changes are committed to the `dev` branch (which auto-deploys a preview at vokabi-wied.vercel.app) and reviewed there; `dev` is merged into `main` only after approval, which is what ships to production.
 
 ## Staging
 
@@ -44,12 +45,13 @@
 
    - Alternatively, install the **Vercel↔Supabase integration** ("Link existing Supabase account") which injects the two `NEXT_PUBLIC_*` variables automatically (keep the default `NEXT_PUBLIC_` prefix)
    - Deploy; attach the custom domain under Settings → Domains
-4. **Verify** — open the site: you should land on `/login`; create the admin account (email from `ADMIN_EMAILS`); Settings should show sync status and the **Back office** button; add a word and confirm it appears in Supabase → Table Editor → `words`
+4. **Groq (optional, AI photo-scan cleanup)** — sign in as an admin, open **Back office → System settings**, paste a Groq API key ([console.groq.com](https://console.groq.com)) and use *Test connection*. The key lives in the `app_settings` table, so no env var or redeploy is involved; without it photo scans use the heuristic fallback
+5. **Verify** — open the site: you should land on `/login`; create the admin account (email from `ADMIN_EMAILS`); Settings should show sync status and the **Back office** button; add a word and confirm it appears in Supabase → Table Editor → `words`
 
 ## Operational gotchas
 
 - **Env var changes require a redeploy** — `NEXT_PUBLIC_*` values are inlined at build time. Vercel: Deployments → ⋯ → Redeploy
-- **Clients cache aggressively** — the service worker updates on a two-visit cycle: users may need to fully close and reopen the app twice after a release. If you change cached static assets or SW logic, bump `CACHE` in `public/sw.js` (currently `vokabi-v6`)
+- **Clients cache aggressively** — the service worker updates on a two-visit cycle: users may need to fully close and reopen the app twice after a release. If you change cached static assets or SW logic, bump `CACHE` in `public/sw.js` (currently `vokabi-v13`)
 - **Database schema changes** are applied manually: re-run the updated SQL file in the Supabase SQL Editor. The files are written idempotently; there is no migration tooling or history table
 - **Local production test**: `npm run build && npm start` (the SW only registers in production mode)
 - **Rollback**: Vercel → Deployments → pick a previous deployment → *Promote to Production*. Note this does not roll back Supabase schema changes

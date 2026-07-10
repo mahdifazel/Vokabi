@@ -7,6 +7,7 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 ## Features
 
 - **Bulk word adding** — paste one word or a whole list; `das Haus`-style articles are detected automatically
+- **Photo scan** — point the camera at a book page or word list (or pick a photo); text is recognized on-device with Tesseract.js, then Groq AI (Llama 3.3) identifies the vocabulary, fixes OCR misreadings, and drops the noise, falling back to heuristic detection automatically when AI is unavailable
 - **Automatic dictionary** — article (🔵 der / 🔴 die / 🟢 das), English translation, plural, IPA, and part of speech via a bundled ~300-word offline seed dictionary → Wiktionary → translation-API fallback, cached in IndexedDB
 - **Native pronunciation** — best available German system voice (Google natural voices on Android, Anna on iOS), voice picker, 0.5–1.5× speed, slow-play button
 - **Listening playlists** — play a group with configurable pause (0–5 s), repeat count (1–5×), read-article and read-translation toggles, shuffle, endless loop; a floating player card shows the current word in large type with its translation and centered controls
@@ -19,13 +20,14 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 - **Import / export** — TXT/CSV import, CSV/JSON export
 - **Accounts & sync** — email/password login (Supabase); words sync across devices, protected by Postgres row-level security; offline-first so everything works without a connection
 - **PWA** — installable on Android, offline service worker, dark (default)/light/system theme, cinematic once-per-session splash
-- **Admin back office** (`/admin`) — user management (ban/delete/reset password), feedback inbox, announcement banners, email broadcast
+- **Admin back office** (`/admin`) — sidebar layout with user management (ban/delete/reset password), feedback inbox, announcement banners, email broadcast, and System settings (Groq AI key, stored server-side and editable without a redeploy)
 
 ## Prerequisites
 
 - **Node.js 18+** (developed on Node 24) and npm
 - Optional, for accounts/sync/admin: a free [Supabase](https://supabase.com) project
 - Optional, for admin email broadcasts: a [Resend](https://resend.com) account
+- Optional, for AI-assisted photo scanning: a free [Groq](https://console.groq.com) API key (entered in the back office, not an env var)
 
 ## Installation
 
@@ -57,6 +59,7 @@ EMAIL_FROM="Vokabi <hello@yourdomain.com>"
 ```
 
 5. Restart the dev server. The app now requires login; sign up with an email listed in `ADMIN_EMAILS` to get the **Back office** button in Settings.
+6. Optional, for AI photo-scan cleanup: open **Back office → System settings** and save your Groq API key (get one free at [console.groq.com](https://console.groq.com)). Without it, photo scans still work using heuristic word detection.
 
 For production deployment see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
@@ -69,6 +72,7 @@ For production deployment see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
   Schmetterling
   ```
   Articles, translations, plurals, and IPA appear automatically a few seconds later.
+- **Scan words**: in the add sheet tap **Scan a photo** → point the camera at the page (or pick from the gallery). The detected words land in the text box for review before adding.
 - **Listen**: open a group → **Play group**. Tune speed, pauses, repeats, and article/translation reading in **Settings → Audio**. Lock the phone — playback continues.
 - **Practice speaking**: open a word → 🎤 **Practice** → say the word → get graded feedback.
 - **Train**: **Learn** tab → pick a source → **Flashcards** or **Quiz**.

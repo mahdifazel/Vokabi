@@ -23,6 +23,9 @@ Until automated coverage exists, changes are verified against the affected flows
 - [ ] Add an obscure word offline → status "no translation found"; Settings → *Retry lookups* fixes it once online
 - [ ] Edit a word manually; delete a word
 - [ ] Open a verb (e.g. "gehen", "aufstehen", "sich freuen") → example with playback, Perfekt with sein/haben chip, collapsible conjugation and grammar sections; nouns/adjectives show none of these
+- [ ] Photo scan: "Scan a photo" opens the in-app camera (or file picker without camera permission); a clear printed word list yields clean entries in the textarea; with the Groq key configured the "Identifying words" phase runs; with the key removed the scan still works (heuristic fallback)
+- [ ] Delete a group that contains words → its words appear in General, not lost
+- [ ] Add-words sheet from the Library page has the first group preselected; from a group page that group is targeted
 
 **Audio** (needs a real Android phone for full confidence)
 - [ ] Single-word play; slow play on word detail
@@ -49,9 +52,11 @@ Until automated coverage exists, changes are verified against the affected flows
 
 **Back office**
 - [ ] Non-admin account: no Back office button; `/admin` shows "administrators" notice; `/api/admin/*` returns 403
+- [ ] Sidebar layout on desktop (≥1024px), top bar with scrollable tabs on mobile; active section highlighted
 - [ ] Users list/detail, ban/unban, password reset, delete user
 - [ ] Feedback: submit from Settings → appears in inbox → resolve
 - [ ] Announcement: publish → banner appears in app → dismiss persists → toggle off removes it
+- [ ] System settings: save a Groq key (masked hint shown), Test connection reports key validity and model availability, Remove key works
 
 ## Recommended future setup (not yet implemented)
 

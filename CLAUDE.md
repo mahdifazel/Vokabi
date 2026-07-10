@@ -6,7 +6,7 @@ Guidance for AI assistants and new developers working in this repository.
 
 ## Project overview
 
-**Vokabi** is a mobile-first Progressive Web App for learning German vocabulary, live at **https://vokabi.app**. Users paste words (single or bulk), the app enriches them automatically with article (der/die/das), English translation, plural, IPA, and part of speech, then trains them through native TTS playback (with lock-screen media controls that keep playing while the screen is off), pronunciation practice via speech recognition, flashcards, and quizzes. Verbs additionally get an on-device conjugation/Perfekt/grammar breakdown (`lib/verbs.ts`). Data is offline-first (IndexedDB) and syncs per-user to Supabase. An admin back office lives at `/admin`.
+**Vokabi** is a mobile-first Progressive Web App for learning German vocabulary, live at **https://vokabi.app**. Users paste words (single or bulk) or scan them from a photo (on-device OCR, cleaned up by Groq AI when configured), the app enriches them automatically with article (der/die/das), English translation, plural, IPA, and part of speech, then trains them through native TTS playback (with lock-screen media controls that keep playing while the screen is off), pronunciation practice via speech recognition, flashcards, and quizzes. Verbs additionally get an on-device conjugation/Perfekt/grammar breakdown (`lib/verbs.ts`). Data is offline-first (IndexedDB) and syncs per-user to Supabase. An admin back office lives at `/admin`.
 
 ## Tech stack
 
@@ -53,11 +53,13 @@ All optional — the app degrades gracefully (local-only mode, admin API returns
 
 Local dev: put them in `.env.local` (gitignored). Production: Vercel project → Settings → Environment Variables (requires redeploy — `NEXT_PUBLIC_*` values are baked at build time).
 
-Database schema is applied **manually** in the Supabase SQL Editor: run `supabase/schema.sql` (words/groups + RLS), then `supabase/admin-schema.sql` (feedback/announcements). There is no migrations tooling.
+The **Groq API key is not an env var**: it lives in the `app_settings` table (service-role only) and is managed in the back office under `/admin/settings`, so it can be changed without a redeploy.
+
+Database schema is applied **manually** in the Supabase SQL Editor: run `supabase/schema.sql` (words/groups + RLS), then `supabase/admin-schema.sql` (feedback/announcements/app_settings). There is no migrations tooling.
 
 ## Architecture in one paragraph
 
-The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing → MyMemory translation fallback. Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist) and `/api/ai/*` (signed-in users; calls Groq with the key stored in `app_settings`, and the client falls back to on-device heuristics when it fails). See `docs/ARCHITECTURE.md` for the full picture.
+The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing → MyMemory translation fallback. Photo scanning (`src/lib/ocr.ts`) runs Tesseract.js on-device (assets self-hosted under `/ocr/`), then the raw text goes to `/api/ai/extract-words` for Groq cleanup with the heuristic line filter as automatic fallback (`src/lib/ai.ts`). Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist) and `/api/ai/*` (signed-in users; calls Groq with the key stored in `app_settings`, and the client falls back to on-device heuristics when it fails). See `docs/ARCHITECTURE.md` for the full picture.
 
 ## Directory structure
 
@@ -91,9 +93,12 @@ src/
     seed-dictionary.ts     ~300 common A1/A2 words bundled for offline
     sync.ts                Push/pull/merge engine + default-group seeding
     auth.ts / supabase.ts  Session store / lazy client (null when unconfigured)
+    ocr.ts                 On-device OCR (Tesseract.js, German) for photo scans
+    ai.ts                  Client for /api/ai/extract-words (null on failure = use fallback)
     player.ts              Playlist engine + Media Session
     tts.ts / speech.ts     Speech synthesis / recognition scoring
     keepalive.ts           Silent-audio loop for background playback
+    diag.ts                Playback event log (hidden UI: 7 taps on Settings footer)
     learn.ts               Learn sources + quiz question builder
     verbs.ts               Verb engine: present conjugation, Perfekt + sein/haben, grammar data
     settings.ts            localStorage settings store + theme application
@@ -101,6 +106,9 @@ src/
     admin/client.ts        adminFetch + admin row types
 public/
   manifest.webmanifest, sw.js (hand-written service worker), icon.svg
+  ocr/                      Tesseract worker/wasm/German model (copied on postinstall)
+scripts/
+  copy-ocr-assets.mjs       Copies Tesseract assets into public/ocr (postinstall)
 supabase/
   schema.sql, admin-schema.sql   Run manually in Supabase SQL Editor
 docs/                       Architecture, decisions, deployment, testing
@@ -124,4 +132,7 @@ docs/                       Architecture, decisions, deployment, testing
 - `/api/` is deliberately excluded from service-worker caching (auth-dependent responses; see commit `e377d23`).
 - The splash plays once per session (`sessionStorage` flag) and is removed pre-paint on reloads — don't reintroduce state that remounts `AppShell`.
 - The `/groups` index route redirects to `/`; group detail `/groups/[id]`, `/favorites`, and `/all` are real pages.
+- Every word must belong to a group: the Library page only shows group cards, so ungrouped words are invisible there. `ensureWordsGrouped()` (in `words.ts`) self-heals by re-homing orphans to "General"; it runs at startup, after sync pulls, and after group deletion. Don't create code paths that leave words ungrouped.
+- The manifest `background_color` must match the dark theme background (`#0c0f1a`): Android's generated PWA launch screen uses it, and the in-app splash draws on that color, so they blend into one splash.
+- Playback diagnostics UI is intentionally hidden: 7 taps on the Settings footer reveal it. The logging itself always runs.
 - Supabase dashboard settings that matter and live outside the repo: Site URL (`https://vokabi.app`), redirect URLs, "Confirm email" disabled (built-in mailer has a very low hourly limit).

@@ -22,12 +22,15 @@ Vokabi is an **offline-first, client-heavy PWA** with a thin server layer used o
   Supabase (cloud)                          External APIs (client-fetched)
    ├─ Auth: email/password sessions          ├─ en.wiktionary.org (gender,
    ├─ Postgres: words, groups                │   plural, IPA, definitions)
-   │   feedback, announcements               └─ api.mymemory.translated.net
-   └─ Row-level security per user                (translation fallback)
-
-  Vercel (hosting)
+   │   feedback, announcements,              └─ api.mymemory.translated.net
+   │   app_settings (server-only KV:             (translation fallback)
+   │   Groq key/model)
+   └─ Row-level security per user           External APIs (server-fetched)
+                                             └─ api.groq.com (Llama 3.3,
+  Vercel (hosting)                               OCR-text → vocabulary)
    ├─ static client bundle + SSR shell
-   └─ /api/admin/* route handlers ── service-role key + ADMIN_EMAILS
+   ├─ /api/admin/* route handlers ── service-role key + ADMIN_EMAILS
+   └─ /api/ai/* route handlers ───── any signed-in user; Groq key from app_settings
 ```
 
 ## Folder structure
@@ -57,6 +60,21 @@ paste text → splitWordList() → rows inserted with status:"pending" (UI shows
 
 Duplicate words are merged into existing rows (group membership union) rather than re-inserted.
 
+**Photo scan** feeds the same flow. The in-app camera (`components/camera-capture.tsx`, so Android doesn't kill the PWA while a system camera is open) or a picked file goes to `lib/ocr.ts`:
+
+```
+photo → downscale on canvas → Tesseract.js (German model, assets self-hosted
+        under /ocr/, cached offline after first download)
+      → raw text → POST /api/ai/extract-words (Groq, key from app_settings):
+                     fixes OCR misreadings, keeps articles/sentences, drops noise
+                   ↳ on ANY failure (no key, signed out, Groq down, timeout,
+                     empty result): heuristic fallback (confidence filter,
+                     letter-ratio filter, hyphenation joining) in lib/ocr.ts
+      → detected words land in the add-words textarea for review
+```
+
+The AI step is server-side only (`lib/ai.ts` returns `null` on failure so callers fall back); the Groq key never reaches the client.
+
 ### 2. Sync (lib/sync.ts)
 
 Dexie hooks in `db.ts` stamp every local mutation with `uid` (UUID) and `dirty: 1`, and notify the sync engine (debounced 2.5 s). `syncNow()` runs, in order:
@@ -66,7 +84,7 @@ Dexie hooks in `db.ts` stamp every local mutation with `uid` (UUID) and `dirty: 
 3. **Push dirty groups**, then **dirty words** (local numeric `groupIds` are translated to group `uid`s for the wire; `favorite` 0/1 ↔ boolean)
 4. **Pull everything** — groups first (build uid→local-id map), then words; per row **last-write-wins**: local wins only if still dirty *and* newer
 5. **Reconcile** — local non-dirty rows whose uid vanished remotely were deleted on another device → delete locally
-6. **Seed default group** — if zero groups exist after the pull, create "General"
+6. **Seed & self-heal** — if zero groups exist after the pull, create "General"; then `ensureWordsGrouped()` re-homes any words left without a group (a deleted group, or group references that didn't resolve in the merge) to General, since the Library page only shows group cards and ungrouped words would be invisible. The same routine runs at app start (local-only mode) and after group deletion
 
 Writes performed by the sync engine are wrapped in `withRemoteWrites()` so the Dexie hooks don't re-mark them dirty (which would echo forever). Triggers: login, app start, debounced local mutations, `online` event, manual "Sync now".
 
@@ -106,6 +124,12 @@ The word detail screen shows verb-specific sections (example sentence, Perfekt, 
 Every route handler calls `requireAdmin(req)`:
 bearer token from the client session → verified via service-role `auth.getUser(token)` → email checked against `ADMIN_EMAILS`. Returns 501 when unconfigured, 401/403 on failures. The service-role client bypasses RLS, which is exactly why it exists only in server code. The client (`lib/admin/client.ts` → `adminFetch`) attaches the session token to every call.
 
+The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with scrollable tabs) with sections for Users, Feedback, Announcements, Email, and **System settings**. System settings manages the Groq API key and model in the `app_settings` table: a plain key/value table with RLS enabled and deliberately **no policies**, so only the service role can touch it. Storing the key in the database (instead of an env var) means it can be added, rotated, or removed from the UI without a redeploy.
+
+### 7. AI routes (src/app/api/ai/*)
+
+`/api/ai/extract-words` is the one non-admin server route: it accepts raw OCR text from **any signed-in user** (bearer token verified via the service-role client, no allowlist), reads the Groq key/model from `app_settings`, and asks Llama 3.3 for a JSON list of vocabulary entries (temperature 0, capped input and output, 20-second timeout, never inventing words that aren't in the text). Every failure mode returns a non-200 status; the client helper (`lib/ai.ts`) converts any of them to `null`, which callers treat as "use the on-device heuristic fallback". This means AI outages degrade the scan quality, never break the feature.
+
 ## Key technical decisions
 
 Summarized here; rationale in `docs/DECISIONS.md`:
@@ -118,6 +142,8 @@ Summarized here; rationale in `docs/DECISIONS.md`:
 - Module-store state via `useSyncExternalStore` instead of a state library
 - Hand-rolled UI primitives in the shadcn idiom instead of the Radix dependency tree
 - Admin authorization via env-var allowlist instead of a roles table
+- OCR on-device (Tesseract.js, self-hosted assets) instead of a vision API
+- AI cleanup via a server-held Groq key in `app_settings` (admin-editable, no redeploy), with the heuristic detection as automatic fallback
 
 ## Known gaps / undocumented areas
 
@@ -128,6 +154,7 @@ Flagged honestly for future work:
 - **No analytics/telemetry** — usage is unknown beyond Supabase table sizes
 - **Settings are per-device** (localStorage), deliberately not synced — undocumented in the UI
 - Wiktionary/MyMemory are called client-side without keys; their rate limits are unenforced and failures degrade to "notfound" silently (a "Retry lookups" button exists in Settings)
+- `/api/ai/extract-words` has no per-user rate limiting: any signed-in user can spend the Groq quota (free tier is generous; revisit if usage grows)
 - `{{de-noun}}` plural parsing is best-effort; unusual template forms yield no plural
 - No in-app "forgot password" flow — resets are triggered from the back office or the Supabase dashboard
 - Supabase dashboard configuration (Site URL, redirect URLs, email confirmation off) lives outside the repo with no infrastructure-as-code

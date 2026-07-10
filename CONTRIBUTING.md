@@ -18,7 +18,7 @@ Thanks for helping improve Vokabi! This guide reflects how the project is actual
 
 ## Branch naming
 
-The project currently commits to `main` directly (solo development — this is the documented reality, not a recommendation). For contributions, branch from `main` using:
+Day-to-day work happens on the `dev` branch, which auto-deploys a preview; `dev` is merged into `main` (production) only after review. For contributions, branch from `main` using:
 
 ```
 feature/<short-description>     # new functionality      e.g. feature/spaced-repetition
