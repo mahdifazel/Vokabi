@@ -122,7 +122,7 @@ The word detail screen shows verb-specific sections (example sentence, Perfekt, 
 ### 6. Admin (src/app/api/admin/*, lib/admin/server.ts)
 
 Every route handler calls `requireAdmin(req)`:
-bearer token from the client session → verified via service-role `auth.getUser(token)` → email checked against `ADMIN_EMAILS`. Returns 501 when unconfigured, 401/403 on failures. The service-role client bypasses RLS, which is exactly why it exists only in server code. The client (`lib/admin/client.ts` → `adminFetch`) attaches the session token to every call.
+bearer token from the client session → verified via service-role `auth.getUser(token)` → email checked against `ADMIN_EMAILS`. Returns 501 when unconfigured, 401/403 on failures. The service-role client bypasses RLS, which is exactly why it exists only in server code. The client (`lib/admin/client.ts` → `adminFetch`) attaches the session token to every call. When the server rejects that token (401), the admin layout signs out locally before redirecting to `/login`: a session can look valid client-side (unexpired JWT in storage) yet be rejected server-side, for example after a Supabase key rotation, and without the local sign-out the login page would see the stored session and bounce right back.
 
 The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with scrollable tabs) with sections for Users, Feedback, Announcements, Email, and **System settings**. System settings manages the Groq API key and model in the `app_settings` table: a plain key/value table with RLS enabled and deliberately **no policies**, so only the service role can touch it. Storing the key in the database (instead of an env var) means it can be added, rotated, or removed from the UI without a redeploy.
 

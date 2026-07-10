@@ -136,3 +136,4 @@ docs/                       Architecture, decisions, deployment, testing
 - The manifest `background_color` must match the dark theme background (`#0c0f1a`): Android's generated PWA launch screen uses it, and the in-app splash draws on that color, so they blend into one splash.
 - Playback diagnostics UI is intentionally hidden: 7 taps on the Settings footer reveal it. The logging itself always runs.
 - Supabase dashboard settings that matter and live outside the repo: Site URL (`https://vokabi.app`), redirect URLs, "Confirm email" disabled (built-in mailer has a very low hourly limit).
+- A stored session can be valid client-side but rejected server-side (rotated Supabase keys → "Invalid session"). Server 401s must clear the local session before redirecting to `/login`, or the login page bounces back (it redirects to `/` whenever a client-side user exists); the admin layout does this.

@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Words without any group were invisible on the Library page (only reachable via All words and search); they are now automatically placed in General
+- A login session the server no longer accepts (e.g. created before a Supabase key rotation) dead-ended the back office: `/admin` redirected to `/login`, which saw the client-side session and bounced straight back. A rejected session is now signed out locally first, so the login form appears and one sign-in recovers everything
 
 ## [1.1.0] — 2026-07-09
 
