@@ -43,3 +43,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 image.png
+
+# Claude Code local settings
+.claude/settings.local.json
