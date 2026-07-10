@@ -16,21 +16,12 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { matchesQuery } from "@/lib/words";
+import { GROUP_TILES } from "@/lib/types";
 import { WordRow } from "@/components/word-row";
 import { AddWordsSheet } from "@/components/add-words-sheet";
+import { NewGroupSheet } from "@/components/new-group-sheet";
 import { VokabiLogo } from "@/components/logo";
-import { Button, Card, EmptyState, Input, Sheet, cn } from "@/components/ui";
-
-// each group gets a stable hue from the same family as the der/die/das colors,
-// so the library reads as a colorful shelf instead of a uniform indigo list
-const GROUP_TILES = [
-  "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300",
-  "bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300",
-  "bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
-  "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
-  "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
-  "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
-];
+import { Button, Card, EmptyState, Input, cn } from "@/components/ui";
 
 function cardReveal(index: number) {
   return {
@@ -44,7 +35,6 @@ export default function LibraryPage() {
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [groupName, setGroupName] = useState("");
 
   const words = useLiveQuery(() => db.words.orderBy("createdAt").reverse().toArray(), []);
   const groups = useLiveQuery(() => db.groups.orderBy("name").toArray(), []);
@@ -63,14 +53,6 @@ export default function LibraryPage() {
     () => (searching ? (words ?? []).filter((w) => matchesQuery(w, query)) : []),
     [words, query, searching]
   );
-
-  async function createGroup() {
-    const name = groupName.trim();
-    if (!name) return;
-    await db.groups.add({ name, createdAt: Date.now() });
-    setGroupName("");
-    setCreateOpen(false);
-  }
 
   return (
     <div className="px-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
@@ -218,18 +200,7 @@ export default function LibraryPage() {
 
       <AddWordsSheet open={addOpen} onClose={() => setAddOpen(false)} />
 
-      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="New group">
-        <Input
-          value={groupName}
-          onChange={(e) => setGroupName(e.target.value)}
-          placeholder="e.g. Food, A1, Verbs…"
-          autoFocus
-          onKeyDown={(e) => e.key === "Enter" && createGroup()}
-        />
-        <Button className="mt-4 w-full" size="lg" disabled={!groupName.trim()} onClick={createGroup}>
-          Create group
-        </Button>
-      </Sheet>
+      <NewGroupSheet open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
   );
 }

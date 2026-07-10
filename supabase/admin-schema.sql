@@ -38,3 +38,19 @@ create table if not exists public.app_settings (
 );
 
 alter table public.app_settings enable row level security;
+
+-- ready-made groups curated in the back office; users can add one (with its
+-- words) from the app's "New group" flow. Only the service role writes them.
+create table if not exists public.preset_groups (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  words jsonb not null default '[]'::jsonb, -- array of German words
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.preset_groups enable row level security;
+
+-- signed-in users browse presets; writes go through the admin API
+create policy "read preset groups" on public.preset_groups
+  for select using (auth.role() = 'authenticated');

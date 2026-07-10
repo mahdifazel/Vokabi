@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  FolderPlus,
   Inbox,
   Loader2,
   Mail,
@@ -34,6 +35,7 @@ const NAV: { label: string; items: NavItem[] }[] = [
       { href: "/admin/users", label: "Users", icon: Users },
       { href: "/admin/feedback", label: "Feedback", icon: Inbox },
       { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
+      { href: "/admin/preset-groups", label: "Preset groups", icon: FolderPlus },
     ],
   },
   {
@@ -52,6 +54,10 @@ const PAGE_HEADERS: Record<string, { title: string; description: string }> = {
   "/admin/announcements": {
     title: "Announcements",
     description: "Banners shown to everyone in the app",
+  },
+  "/admin/preset-groups": {
+    title: "Preset groups",
+    description: "Ready-made groups users can add from the app",
   },
   "/admin/email": { title: "Email", description: "Broadcast an email to all users" },
   "/admin/settings": {

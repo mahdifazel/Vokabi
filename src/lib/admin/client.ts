@@ -50,6 +50,13 @@ export interface AdminAnnouncementRow {
   created_at: string;
 }
 
+export interface AdminPresetGroupRow {
+  id: string;
+  name: string;
+  words: string[];
+  created_at: string;
+}
+
 export interface AdminGroqSettings {
   configured: boolean;
   keyHint: string | null;

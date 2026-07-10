@@ -60,3 +60,20 @@ export async function requireAdmin(
 export function jsonError(message: string, status = 500) {
   return NextResponse.json({ error: message }, { status });
 }
+
+/** Normalize a preset-group words payload: trimmed, non-empty, deduped, bounded. */
+export function cleanWords(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const seen = new Set<string>();
+  const words: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") return null;
+    const w = item.trim().slice(0, 100);
+    const key = w.toLowerCase();
+    if (!w || seen.has(key)) continue;
+    seen.add(key);
+    words.push(w);
+    if (words.length >= 500) break;
+  }
+  return words;
+}
