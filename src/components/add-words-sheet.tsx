@@ -154,62 +154,57 @@ export function AddWordsSheet({
         autoCorrect="off"
         spellCheck={false}
       />
-      <div className="mt-2 flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handlePasteFromClipboard}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary active:opacity-70"
-          >
-            <ClipboardPaste size={16} /> Paste
-          </button>
-          {ocrSupported() && (
-            <button
-              onClick={() => {
-                // in-app camera; the system camera app can get the PWA killed
-                if (typeof navigator.mediaDevices?.getUserMedia === "function") {
-                  setCameraOpen(true);
-                } else {
-                  fileRef.current?.click();
-                }
-              }}
-              disabled={scanState != null}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary active:opacity-70 disabled:opacity-50"
-            >
-              {scanState != null ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  {scanState.phase === "recognizing"
-                    ? `Reading photo ${Math.round(scanState.progress * 100)}%`
-                    : scanState.phase === "analyzing"
-                      ? "Identifying words"
-                      : "Preparing scanner"}
-                </>
-              ) : (
-                <>
-                  <Camera size={16} /> Scan a photo
-                </>
-              )}
-            </button>
+      {text.length > 0 && (
+        <div className="mt-1.5 flex items-center justify-end gap-1">
+          {count > 0 && (
+            <span className="text-sm font-bold text-muted">
+              {count} word{count === 1 ? "" : "s"}
+            </span>
           )}
+          <button
+            onClick={() => {
+              setText("");
+              setScanError(null);
+            }}
+            aria-label="Clear text"
+            className="inline-flex cursor-pointer items-center rounded-xl p-1.5 text-muted active:opacity-70"
+          >
+            <X size={18} />
+          </button>
         </div>
-        {text.length > 0 && (
-          <div className="flex items-center gap-1">
-            {count > 0 && (
-              <span className="text-sm font-bold text-muted">
-                {count} word{count === 1 ? "" : "s"}
-              </span>
+      )}
+      <div className={cn("mt-2 grid gap-2", ocrSupported() ? "grid-cols-2" : "grid-cols-1")}>
+        <Button variant="secondary" onClick={handlePasteFromClipboard}>
+          <ClipboardPaste size={17} className="text-primary" /> Paste text
+        </Button>
+        {ocrSupported() && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              // in-app camera; the system camera app can get the PWA killed
+              if (typeof navigator.mediaDevices?.getUserMedia === "function") {
+                setCameraOpen(true);
+              } else {
+                fileRef.current?.click();
+              }
+            }}
+            disabled={scanState != null}
+          >
+            {scanState != null ? (
+              <>
+                <Loader2 size={17} className="animate-spin" />
+                {scanState.phase === "recognizing"
+                  ? `Reading photo ${Math.round(scanState.progress * 100)}%`
+                  : scanState.phase === "analyzing"
+                    ? "Identifying words"
+                    : "Preparing scanner"}
+              </>
+            ) : (
+              <>
+                <Camera size={17} className="text-primary" /> Scan photo
+              </>
             )}
-            <button
-              onClick={() => {
-                setText("");
-                setScanError(null);
-              }}
-              aria-label="Clear text"
-              className="inline-flex cursor-pointer items-center rounded-xl p-1.5 text-muted active:opacity-70"
-            >
-              <X size={18} />
-            </button>
-          </div>
+          </Button>
         )}
       </div>
       <input
