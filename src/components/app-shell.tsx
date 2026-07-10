@@ -141,7 +141,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                   active ? "text-primary" : "text-muted active:text-foreground"
                 )}
               >
-                <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+                <span
+                  className={cn(
+                    "flex h-7 w-13 items-center justify-center rounded-full transition-colors duration-150",
+                    active && "bg-primary-soft"
+                  )}
+                >
+                  <Icon size={21} strokeWidth={active ? 2.5 : 2} />
+                </span>
                 <span className={cn("text-[11px]", active ? "font-extrabold" : "font-semibold")}>
                   {label}
                 </span>

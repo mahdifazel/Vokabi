@@ -30,7 +30,7 @@ export function WordRow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.3) }}
       className={cn(
-        "flex items-center gap-3 rounded-3xl border bg-surface p-3 pl-4 shadow-[0_1px_3px_rgb(0_0_0/0.04)] transition-colors",
+        "flex items-center gap-3 rounded-3xl border bg-surface p-3 pl-4 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_4px_14px_rgb(0_0_0/0.05)] transition-colors",
         isCurrent ? "border-primary ring-2 ring-primary/30" : "border-border"
       )}
     >

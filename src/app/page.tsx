@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   BookOpen,
@@ -18,7 +19,26 @@ import { matchesQuery } from "@/lib/words";
 import { WordRow } from "@/components/word-row";
 import { AddWordsSheet } from "@/components/add-words-sheet";
 import { VokabiLogo } from "@/components/logo";
-import { Button, Card, EmptyState, Input, Sheet } from "@/components/ui";
+import { Button, Card, EmptyState, Input, Sheet, cn } from "@/components/ui";
+
+// each group gets a stable hue from the same family as the der/die/das colors,
+// so the library reads as a colorful shelf instead of a uniform indigo list
+const GROUP_TILES = [
+  "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300",
+  "bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300",
+  "bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
+  "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
+  "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
+  "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
+];
+
+function cardReveal(index: number) {
+  return {
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.25, delay: Math.min(index * 0.05, 0.4) },
+  };
+}
 
 export default function LibraryPage() {
   const [query, setQuery] = useState("");
@@ -58,8 +78,13 @@ export default function LibraryPage() {
         <VokabiLogo size={40} />
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-black tracking-tight">Vokabi</h1>
-          <p className="text-sm font-semibold text-muted">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-muted">
             {words ? `${words.length} word${words.length === 1 ? "" : "s"}` : "…"}
+            <span aria-hidden className="ml-0.5 inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-500 dark:bg-blue-400" />
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 dark:bg-rose-400" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+            </span>
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => setCreateOpen(true)}>
@@ -114,58 +139,69 @@ export default function LibraryPage() {
         <div className="flex flex-col gap-2.5">
           {/* All words, redundant when there's only one group */}
           {(groups?.length ?? 0) > 1 && (
-            <Link href="/all" className="cursor-pointer">
-              <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-                  <BookOpen size={20} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-extrabold">All words</p>
-                  <p className="text-sm font-semibold text-muted">
-                    {words?.length ?? 0} word{(words?.length ?? 0) === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <ChevronRight size={18} className="text-muted" />
-              </Card>
-            </Link>
-          )}
-
-          {/* Favorites */}
-          {favCount > 0 && (
-            <Link href="/favorites" className="cursor-pointer">
-              <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-100 text-rose-500 dark:bg-rose-500/15 dark:text-rose-400">
-                  <Heart size={20} fill="currentColor" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-extrabold">Favorites</p>
-                  <p className="text-sm font-semibold text-muted">
-                    {favCount} word{favCount === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <ChevronRight size={18} className="text-muted" />
-              </Card>
-            </Link>
-          )}
-
-          {/* Groups */}
-          {groups?.map((g) => {
-            const n = counts.get(g.id!) ?? 0;
-            return (
-              <Link key={g.id} href={`/groups/${g.id}`} className="cursor-pointer">
+            <motion.div {...cardReveal(0)}>
+              <Link href="/all" className="cursor-pointer">
                 <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-                    <FolderOpen size={20} />
+                    <BookOpen size={20} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-extrabold">{g.name}</p>
+                    <p className="font-extrabold">All words</p>
                     <p className="text-sm font-semibold text-muted">
-                      {n} word{n === 1 ? "" : "s"}
+                      {words?.length ?? 0} word{(words?.length ?? 0) === 1 ? "" : "s"}
                     </p>
                   </div>
                   <ChevronRight size={18} className="text-muted" />
                 </Card>
               </Link>
+            </motion.div>
+          )}
+
+          {/* Favorites */}
+          {favCount > 0 && (
+            <motion.div {...cardReveal(1)}>
+              <Link href="/favorites" className="cursor-pointer">
+                <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-100 text-rose-500 dark:bg-rose-500/15 dark:text-rose-400">
+                    <Heart size={20} fill="currentColor" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-extrabold">Favorites</p>
+                    <p className="text-sm font-semibold text-muted">
+                      {favCount} word{favCount === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <ChevronRight size={18} className="text-muted" />
+                </Card>
+              </Link>
+            </motion.div>
+          )}
+
+          {/* Groups */}
+          {groups?.map((g, i) => {
+            const n = counts.get(g.id!) ?? 0;
+            return (
+              <motion.div key={g.id} {...cardReveal(i + 2)}>
+                <Link href={`/groups/${g.id}`} className="cursor-pointer">
+                  <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
+                    <div
+                      className={cn(
+                        "flex h-11 w-11 items-center justify-center rounded-2xl",
+                        GROUP_TILES[(g.id ?? 0) % GROUP_TILES.length]
+                      )}
+                    >
+                      <FolderOpen size={20} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-extrabold">{g.name}</p>
+                      <p className="text-sm font-semibold text-muted">
+                        {n} word{n === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <ChevronRight size={18} className="text-muted" />
+                  </Card>
+                </Link>
+              </motion.div>
             );
           })}
         </div>
@@ -175,7 +211,7 @@ export default function LibraryPage() {
       <button
         onClick={() => setAddOpen(true)}
         aria-label="Add words"
-        className="fixed right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 cursor-pointer items-center justify-center rounded-2xl bg-primary text-on-primary shadow-xl transition-transform active:scale-90"
+        className="fixed right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 cursor-pointer items-center justify-center rounded-2xl bg-linear-to-br from-primary to-violet-600 text-on-primary shadow-xl shadow-primary/30 transition-transform active:scale-90 dark:to-violet-400"
       >
         <Plus size={26} />
       </button>

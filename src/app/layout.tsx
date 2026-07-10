@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Nunito } from "next/font/google";
+import { Baloo_2, Nunito } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 
@@ -7,6 +7,13 @@ const nunito = Nunito({
   variable: "--font-nunito",
   subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+// display face for titles and the wordmark; body text stays Nunito
+const baloo = Baloo_2({
+  variable: "--font-baloo",
+  subsets: ["latin", "latin-ext"],
+  weight: ["600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -52,7 +59,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${nunito.variable} font-sans antialiased`}>
+      <body className={`${nunito.variable} ${baloo.variable} font-sans antialiased`}>
         <AppShell>{children}</AppShell>
       </body>
     </html>
