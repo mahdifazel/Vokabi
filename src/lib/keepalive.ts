@@ -4,10 +4,12 @@
  * Background-playback keep-alive.
  *
  * Android suspends pages (and their speech synthesis + timers) when the
- * screen turns off, unless the tab is audibly playing media. We loop a
- * near-silent WAV at minimal volume while a playlist runs, which keeps the
- * page alive exactly like a music player, and gives the Media Session API
- * a real media element to attach lock-screen controls to.
+ * screen turns off, unless the tab is audibly playing media, where "audibly"
+ * is measured from the actual signal power. We loop a WAV that is quiet
+ * enough for humans but loud enough for that detector while a playlist
+ * runs, which keeps the page alive exactly like a music player, and gives
+ * the Media Session API a real media element to attach lock-screen
+ * controls to.
  *
  * iOS additionally needs the audio session marked as "playback"
  * (navigator.audioSession, Safari 16.4+); without it the system treats the
@@ -62,31 +64,45 @@ function attachBackgroundListeners() {
   });
 }
 
-/** Build a 10s near-silent 8-bit mono WAV (±1 LSB ticks so it counts as audible). */
-function silentWavUrl(): string {
+/**
+ * Build a 10s quiet 30 Hz sine as a 16-bit mono WAV.
+ *
+ * The signal level is load-bearing: Chrome decides whether a tab is
+ * "audibly playing media" by measuring output power (silence threshold is
+ * about -72 dBFS), and only audible tabs keep running timers and get a
+ * media notification when the screen locks. A near-silent signal gets the
+ * tab classified as silent and the playlist freezes with the screen.
+ * 30 Hz at -40 dBFS content x 0.2 element volume is about -54 dBFS: well
+ * above Chrome's threshold, but phone speakers cannot reproduce 30 Hz and
+ * on headphones it sits below the human hearing threshold at that
+ * frequency, so nobody hears it.
+ */
+function quietWavUrl(): string {
   if (objectUrl) return objectUrl;
   const sampleRate = 8000;
   const samples = sampleRate * 10;
-  const buf = new ArrayBuffer(44 + samples);
+  const amplitude = 0.01 * 32767; // -40 dBFS
+  const buf = new ArrayBuffer(44 + samples * 2);
   const v = new DataView(buf);
   const str = (o: number, s: string) => {
     for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i));
   };
   str(0, "RIFF");
-  v.setUint32(4, 36 + samples, true);
+  v.setUint32(4, 36 + samples * 2, true);
   str(8, "WAVE");
   str(12, "fmt ");
   v.setUint32(16, 16, true); // fmt chunk size
   v.setUint16(20, 1, true); // PCM
   v.setUint16(22, 1, true); // mono
   v.setUint32(24, sampleRate, true);
-  v.setUint32(28, sampleRate, true); // byte rate
-  v.setUint16(32, 1, true); // block align
-  v.setUint16(34, 8, true); // bits per sample
+  v.setUint32(28, sampleRate * 2, true); // byte rate
+  v.setUint16(32, 2, true); // block align
+  v.setUint16(34, 16, true); // bits per sample
   str(36, "data");
-  v.setUint32(40, samples, true);
+  v.setUint32(40, samples * 2, true);
   for (let i = 0; i < samples; i++) {
-    v.setUint8(44 + i, 128 + (i % 50 === 0 ? 1 : 0));
+    const value = Math.round(amplitude * Math.sin((2 * Math.PI * 30 * i) / sampleRate));
+    v.setInt16(44 + i * 2, value, true);
   }
   objectUrl = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   return objectUrl;
@@ -100,9 +116,12 @@ export function startKeepAlive() {
   // this no longer fights the speech engine.
   setSessionType("playback");
   if (!audio) {
-    audio = new Audio(silentWavUrl());
+    audio = new Audio(quietWavUrl());
     audio.loop = true;
-    audio.volume = 0.02; // inaudible, but registers as playing audio
+    // total level ~ -54 dBFS: inaudible to people, audible to Chrome's
+    // media detector (see quietWavUrl); iOS ignores volume, where the
+    // content's own -40 dBFS at 30 Hz is still imperceptible
+    audio.volume = 0.2;
     attachBackgroundListeners();
   }
   intentionalPause = false;
