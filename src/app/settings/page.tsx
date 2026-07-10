@@ -58,6 +58,9 @@ export default function SettingsPage() {
   const wordCount = useLiveQuery(() => db.words.count(), []) ?? 0;
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [, setDiagTick] = useState(0); // re-render to show fresh diagnostics
+  // hidden developer menu: 7 taps on the footer reveal playback diagnostics
+  const [diagTaps, setDiagTaps] = useState(0);
+  const showDiag = diagTaps >= 7;
 
   useEffect(() => {
     // voices load asynchronously on Android, refresh once they arrive
@@ -308,6 +311,7 @@ export default function SettingsPage() {
 
       <FeedbackCard />
 
+      {showDiag && (
       <Collapsible title="Playback diagnostics" className="mb-4">
         <p className="mb-2 text-sm font-semibold text-muted">
           Event log for debugging audio playback. Play a list, lock the screen for a
@@ -343,10 +347,15 @@ export default function SettingsPage() {
           {getDiagLog().slice(-120).join("\n") || "No events yet."}
         </pre>
       </Collapsible>
+      )}
 
-      <p className="pb-6 text-center text-xs font-semibold text-muted">
+      <button
+        type="button"
+        onClick={() => setDiagTaps((t) => t + 1)}
+        className="block w-full cursor-default pb-6 text-center text-xs font-semibold text-muted"
+      >
         Vokabi · your personal German vocabulary trainer
-      </p>
+      </button>
     </div>
   );
 }
