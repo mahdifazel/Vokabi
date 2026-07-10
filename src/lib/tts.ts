@@ -10,6 +10,10 @@
  * - getVoices() is empty until "voiceschanged" → never block on it; utterance.lang
  *   alone is enough for the default Google TTS engine to speak German
  * - onend occasionally never fires → hard timeout so playlists can't hang
+ * - with the screen locked some platforms refuse to start new utterances →
+ *   the watchdog holds the current word and keeps retrying instead of
+ *   advancing, so the playlist resumes where it paused (see keepalive.ts
+ *   for what keeps the page itself alive while locked)
  */
 
 let voicesLoaded = false;
@@ -101,12 +105,12 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     let started = false;
     let retried = false;
     let idleMs = 0;
+    let activeMs = 0;
 
     const finish = () => {
       if (done) return;
       done = true;
       clearInterval(watchdog);
-      clearTimeout(hardStop);
       resolve();
     };
 
@@ -118,8 +122,22 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
 
     // Watchdog: if the utterance never starts (Android drops utterances queued
     // right after cancel()), re-queue it once, then give up gracefully.
+    // With the screen locked the rules change: some platforms refuse to start
+    // speech in the background, so instead of giving up (which would silently
+    // burn through the playlist) we hold this word and keep nudging until the
+    // utterance starts or the screen comes back. The hard timeout only counts
+    // time where speech had a real chance to run.
     const watchdog = setInterval(() => {
       if (done) return;
+      const lockedBeforeStart =
+        !started && typeof document !== "undefined" && document.visibilityState === "hidden";
+      if (!lockedBeforeStart) {
+        activeMs += 250;
+        if (activeMs >= HARD_TIMEOUT_MS) {
+          finish();
+          return;
+        }
+      }
       if (started || synth.speaking || synth.pending) {
         idleMs = 0;
         return;
@@ -127,21 +145,19 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
       idleMs += 250;
       if (idleMs >= 1000) {
         idleMs = 0;
-        if (!retried) {
+        if (!retried || lockedBeforeStart) {
           retried = true;
           try {
             synth.resume();
             synth.speak(u);
           } catch {
-            finish();
+            if (!lockedBeforeStart) finish();
           }
         } else {
           finish();
         }
       }
     }, 250);
-
-    const hardStop = setTimeout(finish, HARD_TIMEOUT_MS);
 
     try {
       synth.resume(); // Android Chrome sometimes wakes up paused

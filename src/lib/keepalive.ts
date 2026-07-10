@@ -8,10 +8,28 @@
  * near-silent WAV at minimal volume while a playlist runs, which keeps the
  * page alive exactly like a music player, and gives the Media Session API
  * a real media element to attach lock-screen controls to.
+ *
+ * iOS additionally needs the audio session marked as "playback"
+ * (navigator.audioSession, Safari 16.4+); without it the system treats the
+ * page's audio as expendable and pauses it on screen lock or when the
+ * ring/silent switch is on. iOS may still pause the element on lock, so an
+ * unexpected "pause" restarts playback unless we paused on purpose.
  */
 
 let audio: HTMLAudioElement | null = null;
 let objectUrl: string | null = null;
+let intentionalPause = false;
+
+/** Mark this page's audio as media playback so iOS keeps it running when locked. */
+function requestPlaybackSession() {
+  try {
+    const session = (navigator as Navigator & { audioSession?: { type: string } })
+      .audioSession;
+    if (session) session.type = "playback";
+  } catch {
+    // older browsers without the Audio Session API
+  }
+}
 
 /** Build a 10s near-silent 8-bit mono WAV (±1 LSB ticks so it counts as audible). */
 function silentWavUrl(): string {
@@ -45,11 +63,21 @@ function silentWavUrl(): string {
 
 export function startKeepAlive() {
   if (typeof Audio === "undefined") return;
+  requestPlaybackSession();
   if (!audio) {
     audio = new Audio(silentWavUrl());
     audio.loop = true;
     audio.volume = 0.02; // inaudible, but registers as playing audio
+    audio.addEventListener("pause", () => {
+      // the system paused us (screen lock, interruption): restart shortly,
+      // otherwise timers freeze and the playlist dies with the screen
+      if (intentionalPause) return;
+      setTimeout(() => {
+        if (!intentionalPause) void audio?.play().catch(() => {});
+      }, 250);
+    });
   }
+  intentionalPause = false;
   void audio.play().catch(() => {
     // autoplay blocked, playback was not user-initiated; speech still works
     // in the foreground, it just won't survive the screen turning off
@@ -57,10 +85,12 @@ export function startKeepAlive() {
 }
 
 export function pauseKeepAlive() {
+  intentionalPause = true;
   audio?.pause();
 }
 
 export function stopKeepAlive() {
+  intentionalPause = true;
   if (audio) {
     audio.pause();
     audio.currentTime = 0;
