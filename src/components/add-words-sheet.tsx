@@ -60,6 +60,20 @@ export function AddWordsSheet({
   const groupsQuery = useLiveQuery(() => db.groups.orderBy("name").toArray(), []);
   const groups = groupsQuery ?? EMPTY_GROUPS;
 
+  // opened without a target group (library page): preselect the first group so
+  // adding works without an extra tap; runs once so a deliberate deselect sticks
+  const autoSelected = useRef(false);
+  useEffect(() => {
+    if (autoSelected.current || defaultGroupId != null) return;
+    const first = groupsQuery?.[0];
+    if (first?.id == null) return;
+    autoSelected.current = true;
+    const t = setTimeout(() => {
+      setSelectedGroups((cur) => (cur.length > 0 ? cur : [first.id!]));
+    }, 0);
+    return () => clearTimeout(t);
+  }, [groupsQuery, defaultGroupId]);
+
   const count = splitWordList(text).length;
 
   async function handleAdd() {
