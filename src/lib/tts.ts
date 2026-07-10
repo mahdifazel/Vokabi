@@ -87,11 +87,29 @@ export interface SpeakOptions {
 }
 
 const HARD_TIMEOUT_MS = 20000;
+const ABSOLUTE_TIMEOUT_MS = 120000;
+
+// some platforms pause the synth when the page hides; resume it right away
+let visibilityNudgeArmed = false;
+function armVisibilityNudge() {
+  if (visibilityNudgeArmed || typeof document === "undefined") return;
+  visibilityNudgeArmed = true;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      try {
+        window.speechSynthesis.resume();
+      } catch {
+        // ignore
+      }
+    }
+  });
+}
 
 /** Speak text; resolves when finished, cancelled, or given up on. Never rejects. */
 export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
   if (!ttsSupported() || !text.trim()) return Promise.resolve();
   if (!voicesLoaded) initVoices();
+  armVisibilityNudge();
   const synth = window.speechSynthesis;
 
   return new Promise((resolve) => {
@@ -106,6 +124,7 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     let retried = false;
     let idleMs = 0;
     let activeMs = 0;
+    let totalMs = 0;
 
     const finish = () => {
       if (done) return;
@@ -129,9 +148,16 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     // time where speech had a real chance to run.
     const watchdog = setInterval(() => {
       if (done) return;
+      totalMs += 250;
+      if (totalMs >= ABSOLUTE_TIMEOUT_MS) {
+        finish();
+        return;
+      }
       const lockedBeforeStart =
         !started && typeof document !== "undefined" && document.visibilityState === "hidden";
-      if (!lockedBeforeStart) {
+      // the hard timeout only counts time where speech was expected but not
+      // audibly running: not while locked pre-start, not while speaking
+      if (!lockedBeforeStart && !(started && synth.speaking)) {
         activeMs += 250;
         if (activeMs >= HARD_TIMEOUT_MS) {
           finish();

@@ -14,11 +14,12 @@
  * page's audio as expendable and pauses it on screen lock or when the
  * ring/silent switch is on.
  *
- * IMPORTANT: all of that must happen only while the page is hidden. In the
- * foreground the OS briefly pauses our loop whenever speech starts (audio
- * ducking); restarting it then, or holding a "playback" session, steals the
- * audio output from the speech engine and mutes the pronunciation after a
- * couple of words. Foreground playback needs no help, so we leave it alone.
+ * IMPORTANT: in the foreground the OS briefly pauses our loop whenever
+ * speech starts (audio ducking); restarting it then steals the audio output
+ * from the speech engine and mutes the pronunciation after a couple of
+ * words. So the restart-on-pause fight happens only while the page is
+ * hidden, while the playback session itself is claimed up front inside the
+ * play gesture, because claiming it at lock time is too late for iOS.
  */
 
 let audio: HTMLAudioElement | null = null;
@@ -52,11 +53,12 @@ function attachBackgroundListeners() {
   document.addEventListener("visibilitychange", () => {
     if (intentionalPause) return;
     if (document.visibilityState === "hidden") {
+      // re-assert the session and keep the loop rolling into the lock
       setSessionType("playback");
       if (audio?.paused) void audio.play().catch(() => {});
-    } else {
-      setSessionType("auto");
     }
+    // returning to visible keeps the playback session; it is released in
+    // pauseKeepAlive/stopKeepAlive when the playlist actually stops
   });
 }
 
@@ -92,6 +94,11 @@ function silentWavUrl(): string {
 
 export function startKeepAlive() {
   if (typeof Audio === "undefined") return;
+  // claim the media session up front, inside the user gesture: claiming it
+  // only once the screen locks is too late for iOS to keep the page's audio
+  // alive. Ducking pauses in the foreground are still respected (above), so
+  // this no longer fights the speech engine.
+  setSessionType("playback");
   if (!audio) {
     audio = new Audio(silentWavUrl());
     audio.loop = true;
