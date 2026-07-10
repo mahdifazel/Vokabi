@@ -59,14 +59,16 @@ export function InteractiveMenu({
             <span className="menu__icon">
               <Icon size={22} strokeWidth={active ? 2.5 : 2} />
             </span>
-            <strong
-              className={cn("menu__text", active && "active")}
-              ref={(el) => {
-                textRefs.current[index] = el;
-              }}
-            >
-              {item.label}
-            </strong>
+            <span className="menu__label">
+              <strong
+                className={cn("menu__text", active && "active")}
+                ref={(el) => {
+                  textRefs.current[index] = el;
+                }}
+              >
+                {item.label}
+              </strong>
+            </span>
           </Link>
         );
       })}
