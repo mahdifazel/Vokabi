@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { adminFetch } from "@/lib/admin/client";
+import { signOut } from "@/lib/auth";
 import { VokabiLogo } from "@/components/logo";
 import { Button, cn } from "@/components/ui";
 
@@ -77,7 +78,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       })
       .catch((e: Error & { status?: number }) => {
         if (e.status === 401) {
-          router.replace("/login");
+          // the server rejected the stored session (expired or the Supabase
+          // keys were rotated since login); drop it locally, otherwise the
+          // login page sees a client-side user and bounces straight back
+          void signOut().finally(() => router.replace("/login"));
         } else if (e.status === 501) {
           setState("unconfigured");
           setDetail(e.message);
