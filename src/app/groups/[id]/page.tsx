@@ -14,7 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { deleteGroupAndDetachWords } from "@/lib/words";
+import { deleteGroupAndDetachWords, deleteGroupAndWords } from "@/lib/words";
 import { startPlaylist } from "@/lib/player";
 import { updateSettings, useSettings } from "@/lib/settings";
 import { WordRow } from "@/components/word-row";
@@ -51,8 +51,9 @@ export default function GroupDetailPage({
     setMenuOpen(false);
   }
 
-  async function removeGroup() {
-    await deleteGroupAndDetachWords(groupId);
+  async function removeGroup(withWords: boolean) {
+    if (withWords) await deleteGroupAndWords(groupId);
+    else await deleteGroupAndDetachWords(groupId);
     router.replace("/groups");
   }
 
@@ -159,21 +160,53 @@ export default function GroupDetailPage({
             </Button>
           ) : (
             <div className="rounded-2xl bg-destructive/10 p-4">
-              <p className="mb-3 text-sm font-bold text-destructive">
-                Delete “{group?.name}”? Words stay in your library. Only the group is removed.
+              <p className="mb-1 text-sm font-bold text-destructive">
+                Delete “{group?.name}”?
               </p>
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-destructive text-white"
-                  onClick={removeGroup}
-                >
-                  Delete
-                </Button>
-              </div>
+              {words && words.length > 0 ? (
+                <>
+                  <p className="mb-3 text-xs font-semibold text-destructive/80">
+                    You can keep its {words.length} word{words.length === 1 ? "" : "s"} in your
+                    library, or delete them too. Words that are also in other groups are never
+                    deleted.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => removeGroup(false)}
+                    >
+                      Delete group, keep words
+                    </Button>
+                    <Button
+                      className="w-full bg-destructive text-white"
+                      onClick={() => removeGroup(true)}
+                    >
+                      Delete group and words
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full"
+                      onClick={() => setConfirmDelete(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-2 flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-destructive text-white"
+                    onClick={() => removeGroup(false)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

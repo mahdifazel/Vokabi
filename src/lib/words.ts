@@ -177,6 +177,26 @@ export async function deleteGroupAndDetachWords(groupId: number) {
   scheduleSync();
 }
 
+export async function deleteGroupAndWords(groupId: number) {
+  const members = await db.words.where("groupIds").equals(groupId).toArray();
+  const group = await db.groups.get(groupId);
+  await db.transaction("rw", db.words, db.groups, db.outbox, async () => {
+    for (const w of members) {
+      const rest = w.groupIds.filter((g) => g !== groupId);
+      if (rest.length > 0) {
+        // the word also lives in other groups; keep it there, just detach
+        await db.words.update(w.id!, { groupIds: rest });
+      } else {
+        if (w.uid) await db.outbox.add({ table: "words", uid: w.uid });
+        await db.words.delete(w.id!);
+      }
+    }
+    if (group?.uid) await db.outbox.add({ table: "groups", uid: group.uid });
+    await db.groups.delete(groupId);
+  });
+  scheduleSync();
+}
+
 // ---------------------------------------------------------------------------
 // Search
 // ---------------------------------------------------------------------------
