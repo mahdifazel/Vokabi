@@ -9,12 +9,15 @@ import {
   Loader2,
   Mail,
   Megaphone,
+  Moon,
   Settings,
   ShieldX,
+  Sun,
   Users,
 } from "lucide-react";
 import { adminFetch } from "@/lib/admin/client";
 import { signOut } from "@/lib/auth";
+import { updateSettings, useSettings } from "@/lib/settings";
 import { VokabiLogo } from "@/components/logo";
 import { Button, cn } from "@/components/ui";
 
@@ -61,6 +64,27 @@ type GuardState = "checking" | "ok" | "denied" | "unconfigured";
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
+}
+
+function ThemeToggle() {
+  const { theme } = useSettings();
+  const dark =
+    theme === "dark" ||
+    (theme === "system" &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const label = dark ? "Switch to light mode" : "Switch to dark mode";
+  return (
+    <button
+      type="button"
+      onClick={() => updateSettings({ theme: dark ? "light" : "dark" })}
+      aria-label={label}
+      title={label}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted transition-colors hover:text-foreground active:scale-95"
+    >
+      {dark ? <Sun size={17} /> : <Moon size={17} />}
+    </button>
+  );
 }
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -164,12 +188,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <p className="truncate text-xs font-bold text-muted" title={email}>
             {email}
           </p>
-          <Link
-            href="/"
-            className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-primary"
-          >
-            <ArrowLeft size={15} /> Back to the app
-          </Link>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-primary"
+            >
+              <ArrowLeft size={15} /> Back to the app
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
 
@@ -179,6 +206,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3 pb-3">
             <VokabiLogo size={30} />
             <p className="flex-1 leading-tight font-black tracking-tight">Back office</p>
+            <ThemeToggle />
             <Link
               href="/"
               className="rounded-xl bg-surface-2 px-3 py-1.5 text-sm font-bold text-muted active:scale-95"
