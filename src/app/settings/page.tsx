@@ -21,7 +21,8 @@ import {
   wordsToCSV,
   wordsToJSON,
 } from "@/lib/words";
-import { Button, Card, Segmented, Switch, cn } from "@/components/ui";
+import { clearDiagLog, getDiagLog } from "@/lib/diag";
+import { Button, Card, Collapsible, Segmented, Switch, cn } from "@/components/ui";
 import { AccountCard } from "@/components/account-card";
 import { FeedbackCard } from "@/components/feedback-card";
 
@@ -56,6 +57,7 @@ export default function SettingsPage() {
   const [retrying, setRetrying] = useState(false);
   const wordCount = useLiveQuery(() => db.words.count(), []) ?? 0;
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [, setDiagTick] = useState(0); // re-render to show fresh diagnostics
 
   useEffect(() => {
     // voices load asynchronously on Android, refresh once they arrive
@@ -305,6 +307,42 @@ export default function SettingsPage() {
       </Card>
 
       <FeedbackCard />
+
+      <Collapsible title="Playback diagnostics" className="mb-4">
+        <p className="mb-2 text-sm font-semibold text-muted">
+          Event log for debugging audio playback. Play a list, lock the screen for a
+          bit, then copy the log here.
+        </p>
+        <div className="mb-3 flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setDiagTick((t) => t + 1)}>
+            Refresh
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              void navigator.clipboard
+                ?.writeText(getDiagLog().join("\n"))
+                .catch(() => {});
+            }}
+          >
+            Copy
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              clearDiagLog();
+              setDiagTick((t) => t + 1);
+            }}
+          >
+            Clear
+          </Button>
+        </div>
+        <pre className="max-h-64 overflow-auto rounded-xl bg-surface-2 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+          {getDiagLog().slice(-120).join("\n") || "No events yet."}
+        </pre>
+      </Collapsible>
 
       <p className="pb-6 text-center text-xs font-semibold text-muted">
         Vokabi · your personal German vocabulary trainer

@@ -24,6 +24,8 @@
  * play gesture, because claiming it at lock time is too late for iOS.
  */
 
+import { diag, hiddenFlag } from "./diag";
+
 let audio: HTMLAudioElement | null = null;
 let objectUrl: string | null = null;
 let intentionalPause = false;
@@ -44,20 +46,27 @@ function attachBackgroundListeners() {
   listenersAttached = true;
   // a system pause while hidden freezes the page and kills the playlist;
   // a system pause while visible is speech ducking and must be respected
+  audio.addEventListener("playing", () => diag(`keepalive playing${hiddenFlag()}`));
   audio.addEventListener("pause", () => {
+    diag(`keepalive paused${hiddenFlag()}${intentionalPause ? " (intentional)" : ""}`);
     if (intentionalPause || document.visibilityState !== "hidden") return;
     setTimeout(() => {
       if (!intentionalPause && document.visibilityState === "hidden") {
-        void audio?.play().catch(() => {});
+        diag("keepalive restart attempt");
+        void audio?.play().catch((e) => diag(`keepalive restart rejected: ${e?.name}`));
       }
     }, 250);
   });
   document.addEventListener("visibilitychange", () => {
+    diag(`visibility -> ${document.visibilityState}`);
     if (intentionalPause) return;
     if (document.visibilityState === "hidden") {
       // re-assert the session and keep the loop rolling into the lock
       setSessionType("playback");
-      if (audio?.paused) void audio.play().catch(() => {});
+      if (audio?.paused) {
+        diag("keepalive was paused at lock, restarting");
+        void audio.play().catch((e) => diag(`keepalive lock restart rejected: ${e?.name}`));
+      }
     }
     // returning to visible keeps the playback session; it is released in
     // pauseKeepAlive/stopKeepAlive when the playlist actually stops

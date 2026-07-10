@@ -5,6 +5,7 @@ import type { Word } from "./types";
 import { getSettings } from "./settings";
 import { speak, stopSpeaking } from "./tts";
 import { pauseKeepAlive, startKeepAlive, stopKeepAlive } from "./keepalive";
+import { diag } from "./diag";
 
 export interface PlayerState {
   words: Word[];
@@ -123,6 +124,7 @@ export function startPlaylist(words: Word[], title: string, startIndex = 0) {
   const list = s.shuffle ? shuffled(words) : words;
   generation++;
   stopSpeaking();
+  diag(`playlist start: ${list.length} words`);
   startKeepAlive(); // keeps playback alive when the screen turns off
   registerMediaHandlers();
   setState({ words: list, index: startIndex, playing: true, title, active: true });
@@ -139,6 +141,7 @@ async function runLoop(gen: number) {
       }
       const s = getSettings();
       const word = state.words[state.index];
+      diag(`word ${state.index + 1}/${state.words.length}`);
       const text = wordSpokenText(word, s.readArticle);
       for (let r = 0; r < s.repeatCount; r++) {
         if (!alive() || !state.playing) break;

@@ -16,6 +16,8 @@
  *   for what keeps the page itself alive while locked)
  */
 
+import { diag, hiddenFlag } from "./diag";
+
 let voicesLoaded = false;
 
 export function initVoices() {
@@ -112,6 +114,7 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
   armVisibilityNudge();
   const synth = window.speechSynthesis;
 
+  diag(`speak "${text.slice(0, 24)}"${hiddenFlag()}`);
   return new Promise((resolve) => {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = opts.lang ?? "de-DE";
@@ -135,9 +138,16 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
 
     u.onstart = () => {
       started = true;
+      diag(`utterance started${hiddenFlag()}`);
     };
-    u.onend = finish;
-    u.onerror = finish;
+    u.onend = () => {
+      diag(`utterance ended${hiddenFlag()}`);
+      finish();
+    };
+    u.onerror = (e) => {
+      diag(`utterance error: ${e.error}${hiddenFlag()}`);
+      finish();
+    };
 
     // Watchdog: if the utterance never starts (Android drops utterances queued
     // right after cancel()), re-queue it once, then give up gracefully.
@@ -160,6 +170,7 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
       if (!lockedBeforeStart && !(started && synth.speaking)) {
         activeMs += 250;
         if (activeMs >= HARD_TIMEOUT_MS) {
+          diag(`watchdog hard timeout (started=${started})${hiddenFlag()}`);
           finish();
           return;
         }
@@ -173,13 +184,16 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
         idleMs = 0;
         if (!retried || lockedBeforeStart) {
           retried = true;
+          diag(`watchdog re-queue${hiddenFlag()}`);
           try {
             synth.resume();
             synth.speak(u);
           } catch {
+            diag(`watchdog re-queue threw${hiddenFlag()}`);
             if (!lockedBeforeStart) finish();
           }
         } else {
+          diag(`watchdog gave up${hiddenFlag()}`);
           finish();
         }
       }
