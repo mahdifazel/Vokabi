@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import { jsonError, requireAdmin } from "@/lib/admin/server";
+import { DEFAULT_GROQ_MODEL, DEFAULT_GROQ_VISION_MODEL } from "@/app/api/ai/_shared";
 
 /**
  * Verifies a Groq API key by listing models (a free call) and checks that the
- * chosen model is available. Tests the key from the request body if provided
- * (before saving), otherwise the stored one.
+ * chosen text and vision models are available. Tests the key from the request
+ * body if provided (before saving), otherwise the stored one.
  */
 export async function POST(req: Request) {
   const auth = await requireAdmin(req);
   if ("error" in auth) return auth.error;
 
-  const body = (await req.json().catch(() => ({}))) as { apiKey?: string; model?: string };
+  const body = (await req.json().catch(() => ({}))) as {
+    apiKey?: string;
+    model?: string;
+    visionModel?: string;
+  };
 
   let apiKey = body.apiKey?.trim();
   if (!apiKey) {
@@ -34,10 +39,12 @@ export async function POST(req: Request) {
 
     const json = (await res.json()) as { data?: { id: string }[] };
     const models = (json.data ?? []).map((m) => m.id);
-    const model = body.model?.trim() || "llama-3.3-70b-versatile";
+    const model = body.model?.trim() || DEFAULT_GROQ_MODEL;
+    const visionModel = body.visionModel?.trim() || DEFAULT_GROQ_VISION_MODEL;
     return NextResponse.json({
       ok: true,
       modelAvailable: models.includes(model),
+      visionModelAvailable: models.includes(visionModel),
       modelCount: models.length,
     });
   } catch {

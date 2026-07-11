@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { jsonError, requireAdmin } from "@/lib/admin/server";
+import { DEFAULT_GROQ_MODEL, DEFAULT_GROQ_VISION_MODEL } from "@/app/api/ai/_shared";
 
 const GROQ_KEY = "groq_api_key";
 const GROQ_MODEL = "groq_model";
-const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_VISION_MODEL = "groq_vision_model";
 
 const MISSING_TABLE =
   "Settings storage is missing: run supabase/admin-schema.sql in the Supabase SQL Editor to create the app_settings table.";
@@ -29,6 +30,7 @@ function groqPayload(settings: Map<string, string>) {
     configured: Boolean(key),
     keyHint: key ? maskKey(key) : null,
     model: settings.get(GROQ_MODEL) ?? DEFAULT_GROQ_MODEL,
+    visionModel: settings.get(GROQ_VISION_MODEL) ?? DEFAULT_GROQ_VISION_MODEL,
   };
 }
 
@@ -50,6 +52,7 @@ export async function PUT(req: Request) {
   const body = (await req.json().catch(() => ({}))) as {
     groqApiKey?: string;
     groqModel?: string;
+    groqVisionModel?: string;
     clearGroqKey?: boolean;
   };
 
@@ -62,6 +65,9 @@ export async function PUT(req: Request) {
     }
     if (typeof body.groqModel === "string" && body.groqModel.trim()) {
       upserts.push({ key: GROQ_MODEL, value: body.groqModel.trim(), updated_at: now });
+    }
+    if (typeof body.groqVisionModel === "string" && body.groqVisionModel.trim()) {
+      upserts.push({ key: GROQ_VISION_MODEL, value: body.groqVisionModel.trim(), updated_at: now });
     }
 
     if (upserts.length > 0) {

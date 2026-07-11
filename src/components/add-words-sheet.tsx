@@ -7,7 +7,8 @@ import { db } from "@/lib/db";
 import { addWordsFromText } from "@/lib/words";
 import { splitWordList } from "@/lib/dictionary";
 import { ocrSupported, recognizeGerman, type OcrProgress } from "@/lib/ocr";
-import { extractWordsWithAi } from "@/lib/ai";
+import { extractWordsFromImageWithAi, extractWordsWithAi } from "@/lib/ai";
+import { downscaleToCanvas } from "@/lib/image";
 import type { Group } from "@/lib/types";
 import { Button, Sheet, Textarea, cn } from "./ui";
 import { CameraCapture } from "./camera-capture";
@@ -102,15 +103,22 @@ export function AddWordsSheet({
     setScanError(null);
     setScanState({ phase: "preparing" });
     try {
-      const { rawText, lines } = await recognizeGerman(source, setScanState);
-      let words: string[] | null = null;
-      if (rawText) {
-        // AI cleanup via Groq (configured in the back office); null means
-        // unavailable or failed, then the heuristic lines are the fallback
-        setScanState({ phase: "analyzing" });
-        words = await extractWordsWithAi(rawText);
+      const canvas = await downscaleToCanvas(source);
+
+      // vision first: the photo goes straight to a Groq vision model
+      // (configured in the back office); null means unavailable or failed
+      setScanState({ phase: "analyzing" });
+      let words = await extractWordsFromImageWithAi(canvas);
+
+      if (!words) {
+        // fallback: on-device OCR, then AI text cleanup, then heuristic lines
+        const { rawText, lines } = await recognizeGerman(canvas, setScanState);
+        if (rawText) {
+          setScanState({ phase: "analyzing" });
+          words = await extractWordsWithAi(rawText);
+        }
+        if (!words) words = lines;
       }
-      if (!words) words = lines;
 
       if (words.length === 0) {
         setScanError("No words found in that photo. Try a sharper, closer picture.");

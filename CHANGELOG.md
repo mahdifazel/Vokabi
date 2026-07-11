@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing yet.
+### Changed
+
+- **Photo scan is now vision-first** — the scanned photo (downscaled, as a JPEG) goes straight to a Groq vision model via the new `/api/ai/extract-words-image` route, which reads the vocabulary directly off the image, including handwriting. If that is unavailable for any reason (signed out, no key, Groq down, timeout) the previous pipeline runs unchanged as fallback: on-device Tesseract OCR → Groq text cleanup → heuristic line detection. Local-only and offline scans stay fully on-device. The vision model id is configurable in the back office under System settings (new `groq_vision_model` app setting, default Llama 4 Scout), and Test connection now checks both models
 
 ## [1.3.0] — 2026-07-11
 

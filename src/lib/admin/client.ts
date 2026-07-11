@@ -61,4 +61,5 @@ export interface AdminGroqSettings {
   configured: boolean;
   keyHint: string | null;
   model: string;
+  visionModel: string;
 }

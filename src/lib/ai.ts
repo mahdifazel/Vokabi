@@ -1,40 +1,69 @@
 "use client";
 
+import { canvasToJpegDataUrl } from "./image";
 import { getSupabase } from "./supabase";
 
 /**
- * Ask the server-side AI route (Groq, configured in the back office) to pull
- * the vocabulary out of raw OCR text.
- *
- * Returns null whenever AI cannot be used — local-only mode, signed out,
- * key not configured, Groq down, timeout, or an empty result — so callers
- * can fall back to the on-device heuristic detection. Never throws.
+ * Clients for the server-side AI routes (Groq, configured in the back
+ * office). Every helper returns null whenever AI cannot be used — local-only
+ * mode, signed out, key not configured, Groq down, timeout, or an empty
+ * result — so callers can fall back to the next on-device step. Never throws.
  */
+
+async function getSessionToken(): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
+async function postForWords(
+  path: string,
+  token: string,
+  body: unknown,
+  timeoutMs: number
+): Promise<string[] | null> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) return null;
+
+  const json = (await res.json()) as { words?: unknown };
+  const words = Array.isArray(json.words)
+    ? json.words.filter((w): w is string => typeof w === "string" && w.trim().length > 0)
+    : [];
+  // an empty AI answer is treated as a miss so the next fallback gets a chance
+  return words.length > 0 ? words : null;
+}
+
+/** Pull the vocabulary out of raw OCR text. */
 export async function extractWordsWithAi(rawText: string): Promise<string[] | null> {
   try {
-    const supabase = getSupabase();
-    if (!supabase) return null;
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+    const token = await getSessionToken();
     if (!token) return null;
+    return await postForWords("/api/ai/extract-words", token, { text: rawText }, 25_000);
+  } catch {
+    return null;
+  }
+}
 
-    const res = await fetch("/api/ai/extract-words", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ text: rawText }),
-      signal: AbortSignal.timeout(25_000),
-    });
-    if (!res.ok) return null;
-
-    const json = (await res.json()) as { words?: unknown };
-    const words = Array.isArray(json.words)
-      ? json.words.filter((w): w is string => typeof w === "string" && w.trim().length > 0)
-      : [];
-    // an empty AI answer is treated as a miss so the heuristics get a chance
-    return words.length > 0 ? words : null;
+/** Pull the vocabulary straight out of a scanned photo via a vision model. */
+export async function extractWordsFromImageWithAi(
+  canvas: HTMLCanvasElement
+): Promise<string[] | null> {
+  try {
+    // session check before encoding: local-only/signed-out scans skip the
+    // JPEG work entirely and go straight to on-device OCR
+    const token = await getSessionToken();
+    if (!token) return null;
+    const image = canvasToJpegDataUrl(canvas);
+    return await postForWords("/api/ai/extract-words-image", token, { image }, 30_000);
   } catch {
     return null;
   }

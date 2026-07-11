@@ -10,9 +10,9 @@
  * in IndexedDB after the first download (~5 MB once per device).
  *
  * Quirks encoded here:
- * - Photos are downscaled on a canvas before recognition. Handing a raw 12 MP
- *   File to the wasm worker is the main iOS Safari memory/speed hazard, and
- *   the <img> decode path also applies EXIF rotation for free.
+ * - Photos are downscaled on a canvas before recognition (lib/image.ts); the
+ *   scan flow usually hands over an already-downscaled canvas, making this a
+ *   passthrough.
  * - The logger can only be attached at createWorker time, so progress goes
  *   through a module-level callback that each recognize call swaps in.
  * - Recognize calls are serialized: the singleton worker is reusable, but
@@ -20,6 +20,8 @@
  */
 
 import type { Worker } from "tesseract.js";
+
+import { downscaleToCanvas } from "./image";
 
 export type OcrProgress =
   | { phase: "preparing" }
@@ -33,7 +35,6 @@ export interface OcrResult {
   lines: string[];
 }
 
-const MAX_DIMENSION = 1600;
 const MIN_LINE_CONFIDENCE = 40;
 const MIN_LETTERS = 2;
 const MIN_LETTER_RATIO = 0.5;
@@ -73,34 +74,6 @@ async function getWorker(): Promise<Worker> {
     });
   }
   return workerPromise;
-}
-
-function scaleToMax(source: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
-  const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(width * scale));
-  canvas.height = Math.max(1, Math.round(height * scale));
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas unavailable");
-  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-  return canvas;
-}
-
-/** Decode the photo (or take the captured frame) downscaled onto a canvas. */
-async function toRecognizableCanvas(source: File | HTMLCanvasElement): Promise<HTMLCanvasElement> {
-  if (source instanceof HTMLCanvasElement) {
-    if (Math.max(source.width, source.height) <= MAX_DIMENSION) return source;
-    return scaleToMax(source, source.width, source.height);
-  }
-  const url = URL.createObjectURL(source);
-  try {
-    const img = new Image();
-    img.src = url;
-    await img.decode();
-    return scaleToMax(img, img.naturalWidth, img.naturalHeight);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
 }
 
 const LETTER_RE = /[A-Za-zÄÖÜäöüß]/g;
@@ -143,7 +116,7 @@ export async function recognizeGerman(
     progressCb = onProgress ?? null;
     try {
       onProgress?.({ phase: "preparing" });
-      const canvas = await toRecognizableCanvas(source);
+      const canvas = await downscaleToCanvas(source);
       const worker = await getWorker();
       const { data } = await worker.recognize(canvas, {}, { blocks: true, text: false });
       const rawLines = (data.blocks ?? [])

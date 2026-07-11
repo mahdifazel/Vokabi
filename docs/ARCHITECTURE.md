@@ -28,8 +28,8 @@ Vokabi is an **offline-first, client-heavy PWA** with a thin server layer used o
    │   preset_groups (admin-curated,
    │   read-only for signed-in users)
    └─ Row-level security per user           External APIs (server-fetched)
-                                             └─ api.groq.com (Llama 3.3,
-  Vercel (hosting)                               OCR-text → vocabulary)
+                                             └─ api.groq.com (vision: photo →
+  Vercel (hosting)                               words; text: OCR cleanup)
    ├─ static client bundle + SSR shell
    ├─ /api/admin/* route handlers ── service-role key + ADMIN_EMAILS
    └─ /api/ai/* route handlers ───── any signed-in user; Groq key from app_settings
@@ -64,20 +64,25 @@ Duplicate words are merged into existing rows (group membership union) rather th
 
 **Preset groups** feed the same flow: the "New group" sheet (`components/new-group-sheet.tsx`) fetches admin-curated `preset_groups` rows via `lib/presets.ts` (direct Supabase read; RLS grants select to authenticated users), and picking one creates a plain local group and pushes its word list through `addWordsFromText()` — so preset words enrich, sync, and behave exactly like pasted words, with no lasting link to the preset ("already added" is detected by name).
 
-**Photo scan** feeds the same flow. The in-app camera (`components/camera-capture.tsx`, so Android doesn't kill the PWA while a system camera is open) or a picked file goes to `lib/ocr.ts`:
+**Photo scan** feeds the same flow. The in-app camera (`components/camera-capture.tsx`, so Android doesn't kill the PWA while a system camera is open) or a picked file is decoded and downscaled once (`lib/image.ts`, ≤1600px, EXIF-safe), then goes vision-first:
 
 ```
-photo → downscale on canvas → Tesseract.js (German model, assets self-hosted
-        under /ocr/, cached offline after first download)
-      → raw text → POST /api/ai/extract-words (Groq, key from app_settings):
-                     fixes OCR misreadings, keeps articles/sentences, drops noise
-                   ↳ on ANY failure (no key, signed out, Groq down, timeout,
-                     empty result): heuristic fallback (confidence filter,
-                     letter-ratio filter, hyphenation joining) in lib/ocr.ts
+photo → downscale on canvas (lib/image.ts, shared with OCR)
+      → JPEG data URL → POST /api/ai/extract-words-image (Groq vision model,
+                          key + model from app_settings): reads the vocabulary
+                          straight off the photo, incl. handwriting
+        ↳ on ANY failure (no key, signed out, Groq down, timeout, empty result),
+          fall back to the previous pipeline:
+          Tesseract.js on-device (German model, assets self-hosted under /ocr/,
+          cached offline after first download)
+          → raw text → POST /api/ai/extract-words (Groq text model):
+                         fixes OCR misreadings, keeps articles/sentences, drops noise
+                       ↳ on ANY failure: heuristic fallback (confidence filter,
+                         letter-ratio filter, hyphenation joining) in lib/ocr.ts
       → detected words land in the add-words textarea for review
 ```
 
-The AI step is server-side only (`lib/ai.ts` returns `null` on failure so callers fall back); the Groq key never reaches the client.
+The AI steps are server-side only (`lib/ai.ts` returns `null` on failure so callers fall back); the Groq key never reaches the client. Local-only and signed-out scans skip both uploads and stay fully on-device.
 
 ### 2. Sync (lib/sync.ts)
 
@@ -128,11 +133,11 @@ The word detail screen shows verb-specific sections (example sentence, Perfekt, 
 Every route handler calls `requireAdmin(req)`:
 bearer token from the client session → verified via service-role `auth.getUser(token)` → email checked against `ADMIN_EMAILS`. Returns 501 when unconfigured, 401/403 on failures. The service-role client bypasses RLS, which is exactly why it exists only in server code. The client (`lib/admin/client.ts` → `adminFetch`) attaches the session token to every call. When the server rejects that token (401), the admin layout signs out locally before redirecting to `/login`: a session can look valid client-side (unexpired JWT in storage) yet be rejected server-side, for example after a Supabase key rotation, and without the local sign-out the login page would see the stored session and bounce right back.
 
-The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with scrollable tabs, plus a light/dark theme toggle shared with the app's setting) with sections for Users, Feedback, Announcements, **Preset groups**, Email, and **System settings**. Preset groups are curated word lists stored in the `preset_groups` table: admin routes handle create/update/delete (words normalized server-side: trimmed, deduped, capped), while an RLS select policy lets any signed-in user read them from the app. System settings manages the Groq API key and model in the `app_settings` table: a plain key/value table with RLS enabled and deliberately **no policies**, so only the service role can touch it. Storing the key in the database (instead of an env var) means it can be added, rotated, or removed from the UI without a redeploy.
+The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with scrollable tabs, plus a light/dark theme toggle shared with the app's setting) with sections for Users, Feedback, Announcements, **Preset groups**, Email, and **System settings**. Preset groups are curated word lists stored in the `preset_groups` table: admin routes handle create/update/delete (words normalized server-side: trimmed, deduped, capped), while an RLS select policy lets any signed-in user read them from the app. System settings manages the Groq API key plus the text and vision model ids in the `app_settings` table: a plain key/value table with RLS enabled and deliberately **no policies**, so only the service role can touch it. Storing the key in the database (instead of an env var) means it can be added, rotated, or removed from the UI without a redeploy.
 
 ### 7. AI routes (src/app/api/ai/*)
 
-`/api/ai/extract-words` is the one non-admin server route: it accepts raw OCR text from **any signed-in user** (bearer token verified via the service-role client, no allowlist), reads the Groq key/model from `app_settings`, and asks Llama 3.3 for a JSON list of vocabulary entries (temperature 0, capped input and output, 20-second timeout, never inventing words that aren't in the text). Every failure mode returns a non-200 status; the client helper (`lib/ai.ts`) converts any of them to `null`, which callers treat as "use the on-device heuristic fallback". This means AI outages degrade the scan quality, never break the feature.
+Two non-admin server routes accept requests from **any signed-in user** (bearer token verified via the service-role client, no allowlist) and share their plumbing in `src/app/api/ai/_shared.ts` (auth, `app_settings` read, Groq call, word-list parsing). `/api/ai/extract-words-image` takes a downscaled JPEG data URL and asks the configured vision model (default Llama 4 Scout, key `groq_vision_model`) for a JSON list of vocabulary entries read straight off the photo. `/api/ai/extract-words` takes raw OCR text and asks the text model (default Llama 3.3, key `groq_model`) to clean it up. Both run at temperature 0 with capped input and output, 25/20-second timeouts, and prompts forbidding invented words. Every failure mode returns a non-200 status; the client helpers (`lib/ai.ts`) convert any of them to `null`, which callers treat as "use the next fallback" (vision → on-device OCR + text cleanup → heuristics). This means AI outages degrade the scan quality, never break the feature.
 
 ## Key technical decisions
 
@@ -146,8 +151,8 @@ Summarized here; rationale in `docs/DECISIONS.md`:
 - Module-store state via `useSyncExternalStore` instead of a state library
 - Hand-rolled UI primitives in the shadcn idiom instead of the Radix dependency tree
 - Admin authorization via env-var allowlist instead of a roles table
-- OCR on-device (Tesseract.js, self-hosted assets) instead of a vision API
-- AI cleanup via a server-held Groq key in `app_settings` (admin-editable, no redeploy), with the heuristic detection as automatic fallback
+- Photo scan is vision-first (Groq vision model on the downscaled photo), with on-device OCR (Tesseract.js, self-hosted assets) + AI text cleanup + heuristic detection as the automatic fallback chain
+- Groq key and model ids server-held in `app_settings` (admin-editable, no redeploy); the key never reaches the client
 
 ## Known gaps / undocumented areas
 
@@ -158,7 +163,7 @@ Flagged honestly for future work:
 - **No analytics/telemetry** — usage is unknown beyond Supabase table sizes
 - **Settings are per-device** (localStorage), deliberately not synced — undocumented in the UI
 - Wiktionary/MyMemory are called client-side without keys; their rate limits are unenforced and failures degrade to "notfound" silently (a "Retry lookups" button exists in Settings)
-- `/api/ai/extract-words` has no per-user rate limiting: any signed-in user can spend the Groq quota (free tier is generous; revisit if usage grows)
+- The `/api/ai/*` routes (`extract-words`, `extract-words-image`) have no per-user rate limiting: any signed-in user can spend the Groq quota (free tier is generous; revisit if usage grows)
 - `{{de-noun}}` plural parsing is best-effort; unusual template forms yield no plural
 - No in-app "forgot password" flow — resets are triggered from the back office or the Supabase dashboard
 - Supabase dashboard configuration (Site URL, redirect URLs, email confirmation off) lives outside the repo with no infrastructure-as-code

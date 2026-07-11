@@ -12,6 +12,7 @@ export default function AdminSettingsPage() {
   const [keyInput, setKeyInput] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState("");
+  const [visionModel, setVisionModel] = useState("");
   const [busy, setBusy] = useState<"save" | "test" | "remove" | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -21,6 +22,7 @@ export default function AdminSettingsPage() {
       .then((d) => {
         setGroq(d.groq);
         setModel(d.groq.model);
+        setVisionModel(d.groq.visionModel);
       })
       .catch((e: Error) => setLoadError(e.message));
   }, []);
@@ -36,10 +38,12 @@ export default function AdminSettingsPage() {
         body: JSON.stringify({
           groqApiKey: keyInput.trim() || undefined,
           groqModel: model.trim() || undefined,
+          groqVisionModel: visionModel.trim() || undefined,
         }),
       });
       setGroq(d.groq);
       setModel(d.groq.model);
+      setVisionModel(d.groq.visionModel);
       setKeyInput("");
       setNotice("Settings saved");
     } catch (e) {
@@ -55,17 +59,27 @@ export default function AdminSettingsPage() {
     setNotice("");
     setError("");
     try {
-      const d = await adminFetch<{ ok: boolean; modelAvailable: boolean; modelCount: number }>(
-        "/api/admin/settings/test-groq",
-        {
-          method: "POST",
-          body: JSON.stringify({ apiKey: keyInput.trim() || undefined, model: model.trim() }),
-        }
-      );
+      const d = await adminFetch<{
+        ok: boolean;
+        modelAvailable: boolean;
+        visionModelAvailable: boolean;
+        modelCount: number;
+      }>("/api/admin/settings/test-groq", {
+        method: "POST",
+        body: JSON.stringify({
+          apiKey: keyInput.trim() || undefined,
+          model: model.trim(),
+          visionModel: visionModel.trim(),
+        }),
+      });
+      const missing = [
+        ...(d.modelAvailable ? [] : [model.trim()]),
+        ...(d.visionModelAvailable ? [] : [visionModel.trim()]),
+      ];
       setNotice(
-        d.modelAvailable
-          ? `Connection OK: key is valid and ${model.trim()} is available.`
-          : `Key is valid, but ${model.trim()} was not in Groq's model list (${d.modelCount} models). Double-check the model id.`
+        missing.length === 0
+          ? `Connection OK: key is valid and both models are available.`
+          : `Key is valid, but ${missing.join(" and ")} was not in Groq's model list (${d.modelCount} models). Double-check the model id.`
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Test failed");
@@ -114,7 +128,7 @@ export default function AdminSettingsPage() {
             <p className="text-xs font-extrabold tracking-wide text-muted uppercase">
               AI provider
             </p>
-            <p className="mt-1 text-lg font-black tracking-tight">Groq · Llama 3.3</p>
+            <p className="mt-1 text-lg font-black tracking-tight">Groq</p>
           </div>
           <span
             className={cn(
@@ -133,8 +147,9 @@ export default function AdminSettingsPage() {
         </div>
 
         <p className="mt-2 text-sm font-semibold text-muted">
-          The key is stored server-side and never reaches the app. It will power upcoming AI
-          features like smarter enrichment and example sentences.
+          The key is stored server-side and never reaches the app. It powers the photo scan:
+          the vision model reads words straight from the photo, and the text model cleans up
+          on-device OCR output as fallback.
         </p>
 
         <label className="mt-4 block text-sm font-extrabold">
@@ -162,7 +177,7 @@ export default function AdminSettingsPage() {
         </label>
 
         <label className="mt-3 block text-sm font-extrabold">
-          Model
+          Text model (OCR cleanup)
           <Input
             className="mt-1"
             value={model}
@@ -172,8 +187,24 @@ export default function AdminSettingsPage() {
           />
         </label>
 
+        <label className="mt-3 block text-sm font-extrabold">
+          Vision model (photo scan)
+          <Input
+            className="mt-1"
+            value={visionModel}
+            onChange={(e) => setVisionModel(e.target.value)}
+            placeholder="meta-llama/llama-4-scout-17b-16e-instruct"
+            aria-label="Groq vision model id"
+          />
+        </label>
+
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button onClick={save} disabled={busy !== null || (!keyInput.trim() && !model.trim())}>
+          <Button
+            onClick={save}
+            disabled={
+              busy !== null || (!keyInput.trim() && !model.trim() && !visionModel.trim())
+            }
+          >
             {busy === "save" ? (
               <Loader2 size={17} className="animate-spin" />
             ) : (
