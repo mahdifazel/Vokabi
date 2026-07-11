@@ -21,10 +21,12 @@ alter table public.feedback enable row level security;
 alter table public.announcements enable row level security;
 
 -- users may submit feedback as themselves; only the service role reads it
+drop policy if exists "submit own feedback" on public.feedback;
 create policy "submit own feedback" on public.feedback
   for insert with check (auth.uid() = user_id);
 
 -- signed-in users see active announcements; only the service role writes them
+drop policy if exists "read active announcements" on public.announcements;
 create policy "read active announcements" on public.announcements
   for select using (auth.role() = 'authenticated' and active);
 
@@ -52,5 +54,6 @@ create table if not exists public.preset_groups (
 alter table public.preset_groups enable row level security;
 
 -- signed-in users browse presets; writes go through the admin API
+drop policy if exists "read preset groups" on public.preset_groups;
 create policy "read preset groups" on public.preset_groups
   for select using (auth.role() = 'authenticated');

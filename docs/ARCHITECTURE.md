@@ -24,7 +24,9 @@ Vokabi is an **offline-first, client-heavy PWA** with a thin server layer used o
    ├─ Postgres: words, groups                │   plural, IPA, definitions)
    │   feedback, announcements,              └─ api.mymemory.translated.net
    │   app_settings (server-only KV:             (translation fallback)
-   │   Groq key/model)
+   │   Groq key/model),
+   │   preset_groups (admin-curated,
+   │   read-only for signed-in users)
    └─ Row-level security per user           External APIs (server-fetched)
                                              └─ api.groq.com (Llama 3.3,
   Vercel (hosting)                               OCR-text → vocabulary)
@@ -59,6 +61,8 @@ paste text → splitWordList() → rows inserted with status:"pending" (UI shows
 ```
 
 Duplicate words are merged into existing rows (group membership union) rather than re-inserted.
+
+**Preset groups** feed the same flow: the "New group" sheet (`components/new-group-sheet.tsx`) fetches admin-curated `preset_groups` rows via `lib/presets.ts` (direct Supabase read; RLS grants select to authenticated users), and picking one creates a plain local group and pushes its word list through `addWordsFromText()` — so preset words enrich, sync, and behave exactly like pasted words, with no lasting link to the preset ("already added" is detected by name).
 
 **Photo scan** feeds the same flow. The in-app camera (`components/camera-capture.tsx`, so Android doesn't kill the PWA while a system camera is open) or a picked file goes to `lib/ocr.ts`:
 
@@ -124,7 +128,7 @@ The word detail screen shows verb-specific sections (example sentence, Perfekt, 
 Every route handler calls `requireAdmin(req)`:
 bearer token from the client session → verified via service-role `auth.getUser(token)` → email checked against `ADMIN_EMAILS`. Returns 501 when unconfigured, 401/403 on failures. The service-role client bypasses RLS, which is exactly why it exists only in server code. The client (`lib/admin/client.ts` → `adminFetch`) attaches the session token to every call. When the server rejects that token (401), the admin layout signs out locally before redirecting to `/login`: a session can look valid client-side (unexpired JWT in storage) yet be rejected server-side, for example after a Supabase key rotation, and without the local sign-out the login page would see the stored session and bounce right back.
 
-The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with scrollable tabs) with sections for Users, Feedback, Announcements, Email, and **System settings**. System settings manages the Groq API key and model in the `app_settings` table: a plain key/value table with RLS enabled and deliberately **no policies**, so only the service role can touch it. Storing the key in the database (instead of an env var) means it can be added, rotated, or removed from the UI without a redeploy.
+The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with scrollable tabs, plus a light/dark theme toggle shared with the app's setting) with sections for Users, Feedback, Announcements, **Preset groups**, Email, and **System settings**. Preset groups are curated word lists stored in the `preset_groups` table: admin routes handle create/update/delete (words normalized server-side: trimmed, deduped, capped), while an RLS select policy lets any signed-in user read them from the app. System settings manages the Groq API key and model in the `app_settings` table: a plain key/value table with RLS enabled and deliberately **no policies**, so only the service role can touch it. Storing the key in the database (instead of an env var) means it can be added, rotated, or removed from the UI without a redeploy.
 
 ### 7. AI routes (src/app/api/ai/*)
 

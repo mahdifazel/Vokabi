@@ -6,7 +6,7 @@ Guidance for AI assistants and new developers working in this repository.
 
 ## Project overview
 
-**Vokabi** is a mobile-first Progressive Web App for learning German vocabulary, live at **https://vokabi.app**. Users paste words (single or bulk) or scan them from a photo (on-device OCR, cleaned up by Groq AI when configured), the app enriches them automatically with article (der/die/das), English translation, plural, IPA, and part of speech, then trains them through native TTS playback (with lock-screen media controls that keep playing while the screen is off), pronunciation practice via speech recognition, flashcards, and quizzes. Verbs additionally get an on-device conjugation/Perfekt/grammar breakdown (`lib/verbs.ts`). Data is offline-first (IndexedDB) and syncs per-user to Supabase. An admin back office lives at `/admin`.
+**Vokabi** is a mobile-first Progressive Web App for learning German vocabulary, live at **https://vokabi.app**. Users paste words (single or bulk) or scan them from a photo (on-device OCR, cleaned up by Groq AI when configured), the app enriches them automatically with article (der/die/das), English translation, plural, IPA, and part of speech, then trains them through native TTS playback (with lock-screen media controls that keep playing while the screen is off), pronunciation practice via speech recognition, flashcards, and quizzes. Verbs additionally get an on-device conjugation/Perfekt/grammar breakdown (`lib/verbs.ts`). Data is offline-first (IndexedDB) and syncs per-user to Supabase. An admin back office lives at `/admin`; among other things it curates **preset groups** (ready-made word lists) that users can add from the app's "New group" flow.
 
 ## Tech stack
 
@@ -19,7 +19,7 @@ Guidance for AI assistants and new developers working in this repository.
 | Local DB | Dexie 4 (IndexedDB) + dexie-react-hooks (`useLiveQuery`) | Source of truth on-device |
 | Cloud | Supabase (`@supabase/supabase-js` v2) | Auth (email/password) + Postgres with row-level security |
 | Speech | Web Speech API | `speechSynthesis` for TTS, `webkitSpeechRecognition` for practice scoring |
-| Fonts | Nunito via `next/font/google` | CSS var `--font-nunito` |
+| Fonts | Nunito (body) + Baloo 2 (display) via `next/font/google` | CSS vars `--font-nunito`, `--font-baloo`; `h1`/`h2` use the display face (rule in `globals.css`) |
 | Hosting | Vercel | Auto-deploys from `main`; custom domain vokabi.app |
 
 ## Key commands
@@ -55,11 +55,11 @@ Local dev: put them in `.env.local` (gitignored). Production: Vercel project →
 
 The **Groq API key is not an env var**: it lives in the `app_settings` table (service-role only) and is managed in the back office under `/admin/settings`, so it can be changed without a redeploy.
 
-Database schema is applied **manually** in the Supabase SQL Editor: run `supabase/schema.sql` (words/groups + RLS), then `supabase/admin-schema.sql` (feedback/announcements/app_settings). There is no migrations tooling.
+Database schema is applied **manually** in the Supabase SQL Editor: run `supabase/schema.sql` (words/groups + RLS), then `supabase/admin-schema.sql` (feedback/announcements/app_settings/preset_groups). There is no migrations tooling.
 
 ## Architecture in one paragraph
 
-The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing → MyMemory translation fallback. Photo scanning (`src/lib/ocr.ts`) runs Tesseract.js on-device (assets self-hosted under `/ocr/`), then the raw text goes to `/api/ai/extract-words` for Groq cleanup with the heuristic line filter as automatic fallback (`src/lib/ai.ts`). Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist) and `/api/ai/*` (signed-in users; calls Groq with the key stored in `app_settings`, and the client falls back to on-device heuristics when it fails). See `docs/ARCHITECTURE.md` for the full picture.
+The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing → MyMemory translation fallback. Photo scanning (`src/lib/ocr.ts`) runs Tesseract.js on-device (assets self-hosted under `/ocr/`), then the raw text goes to `/api/ai/extract-words` for Groq cleanup with the heuristic line filter as automatic fallback (`src/lib/ai.ts`). Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist) and `/api/ai/*` (signed-in users; calls Groq with the key stored in `app_settings`, and the client falls back to on-device heuristics when it fails). Preset groups are the one admin-curated table users read directly: `lib/presets.ts` queries `preset_groups` via the Supabase client (RLS allows select to authenticated users), and adding one materializes a normal local group + words through the standard pipeline. See `docs/ARCHITECTURE.md` for the full picture.
 
 ## Directory structure
 
@@ -84,7 +84,9 @@ src/
   components/
     app-shell.tsx          Bottom nav, auth gate, splash orchestration, SW registration
     ui.tsx                 Primitives: Button, Card, Input, Switch, Segmented, Sheet, Collapsible…
-    …                      Feature components (word-row, mini-player, verb-details, splash, …)
+    interactive-menu.tsx   Animated bottom nav (icon bounce, label slides in beside it)
+    new-group-sheet.tsx    "New group" flow: custom name or searchable preset browser
+    …                      Feature components (word-row, add-words-sheet, mini-player, verb-details, splash, …)
   lib/
     types.ts               All shared types + article color maps
     db.ts                  Dexie schema v2, mutation hooks (uid/dirty), remote-write guard
@@ -92,6 +94,7 @@ src/
     dictionary.ts          Lookup pipeline + Wiktionary wikitext parser
     seed-dictionary.ts     ~300 common A1/A2 words bundled for offline
     sync.ts                Push/pull/merge engine + default-group seeding
+    presets.ts             Fetch admin-curated preset groups (null when unconfigured)
     auth.ts / supabase.ts  Session store / lazy client (null when unconfigured)
     ocr.ts                 On-device OCR (Tesseract.js, German) for photo scans
     ai.ts                  Client for /api/ai/extract-words (null on failure = use fallback)
@@ -132,7 +135,7 @@ docs/                       Architecture, decisions, deployment, testing
 - `/api/` is deliberately excluded from service-worker caching (auth-dependent responses; see commit `e377d23`).
 - The splash plays once per session (`sessionStorage` flag) and is removed pre-paint on reloads — don't reintroduce state that remounts `AppShell`.
 - The `/groups` index route redirects to `/`; group detail `/groups/[id]`, `/favorites`, and `/all` are real pages.
-- Every word must belong to a group: the Library page only shows group cards, so ungrouped words are invisible there. `ensureWordsGrouped()` (in `words.ts`) self-heals by re-homing orphans to "General"; it runs at startup, after sync pulls, and after group deletion. Don't create code paths that leave words ungrouped.
+- Every word must belong to a group: the Library page only shows group cards, so ungrouped words are invisible there. `ensureWordsGrouped()` (in `words.ts`) self-heals by re-homing orphans to "General"; it runs at startup, after sync pulls, and after group deletion. Don't create code paths that leave words ungrouped. Deleting a group offers two options: keep its words (re-homed) or delete them too — but words that also belong to other groups are never deleted, only detached.
 - The manifest `background_color` must match the dark theme background (`#0c0f1a`): Android's generated PWA launch screen uses it, and the in-app splash draws on that color, so they blend into one splash.
 - Playback diagnostics UI is intentionally hidden: 7 taps on the Settings footer reveal it. The logging itself always runs.
 - Supabase dashboard settings that matter and live outside the repo: Site URL (`https://vokabi.app`), redirect URLs, "Confirm email" disabled (built-in mailer has a very low hourly limit).

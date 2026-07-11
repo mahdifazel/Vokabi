@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [1.3.0] — 2026-07-11
+
+### Added
+
+- **Preset groups** — the back office has a new Manage → Preset groups section for curating ready-made groups with optional word lists (create, inline edit, two-tap delete). In the app, **New group** now offers two paths: *Create my own* (the classic name form) or *Choose a ready-made group* — a searchable browser (matches names and the words inside) with colored tiles, word previews, one-tap add, and "already added" detection. Adding a preset creates a regular local group and enriches its words through the normal pipeline. New `preset_groups` table in `supabase/admin-schema.sql` (service-role writes, authenticated read) — re-run that file in the Supabase SQL Editor when upgrading
+- **Group deletion choice** — deleting a non-empty group now asks whether to keep its words in the library (re-homed to General) or delete them too; words that also belong to other groups are never deleted, only detached
+- **Back office light/dark toggle** — sun/moon switch in the sidebar footer (desktop) and top bar (mobile), sharing the app's theme setting
+
+### Changed
+
+- **Design refresh** — Baloo 2 display font for titles and sheet headers; soft der/die/das-tinted glows behind every page; group cards get stable per-group tile colors with a staggered reveal; gradient add-words button; slightly deeper card shadows
+- **Animated bottom navigation** — inactive tabs show a centered icon; the active tab bounces its icon and slides the label in beside it with an underline animated to the label's width; Library now stays highlighted on its sub-pages (groups, favorites, all words)
+- The add-words sheet's Paste and Scan actions are now prominent full-width buttons ("Paste text" / "Scan photo") instead of small text links
+- Focused inputs show a tinted border with a soft glow instead of a heavy offset outline; the floating + button casts a lighter shadow
+
 ## [1.2.0] — 2026-07-10
 
 ### Added
@@ -101,7 +116,8 @@ Initial release at [vokabi.app](https://vokabi.app).
 - Service worker excludes `/api/` from caching so per-user admin responses can never leak between accounts on a shared device
 - Admin authorization enforced server-side on every request (bearer token verification + allowlist)
 
-[Unreleased]: https://github.com/mahdifazel/Vokabi/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/mahdifazel/Vokabi/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/mahdifazel/Vokabi/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/mahdifazel/Vokabi/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mahdifazel/Vokabi/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/mahdifazel/Vokabi/releases/tag/v1.0.0

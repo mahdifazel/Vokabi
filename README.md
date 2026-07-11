@@ -16,11 +16,11 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 - **Pronunciation practice** — speak the word, get *Excellent / Good / Needs improvement* with mistake letters highlighted (speech recognition)
 - **Flashcards** — 3D flip cards, swipe right = got it / left = still learning, retry-missed rounds
 - **Quiz** — multiple choice: German→English, English→German, and der/die/das article questions with audio feedback
-- **Organization** — groups (with a default **General** group), favorites, instant global search, word details with examples and notes
+- **Organization** — groups (with a default **General** group), favorites, instant global search, word details with examples and notes; "New group" offers a custom name or a searchable list of **ready-made groups** curated in the back office (added with their words in one tap); deleting a group lets you keep its words or delete them too (words shared with other groups are never deleted)
 - **Import / export** — TXT/CSV import, CSV/JSON export
 - **Accounts & sync** — email/password login (Supabase); words sync across devices, protected by Postgres row-level security; offline-first so everything works without a connection
 - **PWA** — installable on Android, offline service worker, dark (default)/light/system theme, cinematic once-per-session splash
-- **Admin back office** (`/admin`) — sidebar layout with user management (ban/delete/reset password), feedback inbox, announcement banners, email broadcast, and System settings (Groq AI key, stored server-side and editable without a redeploy)
+- **Admin back office** (`/admin`) — sidebar layout with light/dark toggle, user management (ban/delete/reset password), feedback inbox, announcement banners, preset groups (curated word lists users can add from the app), email broadcast, and System settings (Groq AI key, stored server-side and editable without a redeploy)
 
 ## Prerequisites
 
@@ -72,7 +72,8 @@ For production deployment see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
   Schmetterling
   ```
   Articles, translations, plurals, and IPA appear automatically a few seconds later.
-- **Scan words**: in the add sheet tap **Scan a photo** → point the camera at the page (or pick from the gallery). The detected words land in the text box for review before adding.
+- **Scan words**: in the add sheet tap **Scan photo** → point the camera at the page (or pick from the gallery). The detected words land in the text box for review before adding.
+- **Add a ready-made group**: **New group** → **Choose a ready-made group** → search and tap one; it lands in your library with all its words.
 - **Listen**: open a group → **Play group**. Tune speed, pauses, repeats, and article/translation reading in **Settings → Audio**. Lock the phone — playback continues.
 - **Practice speaking**: open a word → 🎤 **Practice** → say the word → get graded feedback.
 - **Train**: **Learn** tab → pick a source → **Flashcards** or **Quiz**.

@@ -35,8 +35,10 @@ create index if not exists groups_user_idx on public.groups (user_id);
 alter table public.words enable row level security;
 alter table public.groups enable row level security;
 
+drop policy if exists "own words" on public.words;
 create policy "own words" on public.words
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "own groups" on public.groups;
 create policy "own groups" on public.groups
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
