@@ -130,7 +130,7 @@ export default function GroupDetailPage({
         <button
           onClick={() => setAddOpen(true)}
           aria-label="Add words to group"
-          className="fixed right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 cursor-pointer items-center justify-center rounded-2xl bg-primary text-on-primary shadow-xl transition-transform active:scale-90"
+          className="fixed right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 cursor-pointer items-center justify-center rounded-2xl bg-linear-to-br from-primary to-violet-600 text-on-primary shadow-lg shadow-primary/20 transition-transform active:scale-90 dark:to-violet-400"
         >
           <Plus size={26} />
         </button>
