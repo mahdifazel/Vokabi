@@ -20,7 +20,7 @@ Vokabi is an **offline-first, client-heavy PWA** with a thin server layer used o
 └────────┼─────────────────────────────────────────────────────────────────┘
          ▼
   Supabase (cloud)                          External APIs (client-fetched)
-   ├─ Auth: email/password sessions          ├─ en.wiktionary.org (gender,
+   ├─ Auth: email/password + Google          ├─ en.wiktionary.org (gender,
    ├─ Postgres: words, groups                │   plural, IPA, definitions)
    │   feedback, announcements,              └─ api.mymemory.translated.net
    │   app_settings (server-only KV:             (translation fallback)
@@ -62,6 +62,8 @@ paste text → splitWordList() → rows inserted with status:"pending" (UI shows
 
 Duplicate words are merged into existing rows (group membership union) rather than re-inserted.
 
+`splitWordList()` separates entries on newlines, semicolons, `/`, or a dash surrounded by spaces. Commas never split, so plural notes ("die Katze, -n") and example sentences stay one entry, and a bare dash never splits either ("E-Mail", the plural shorthand "-n").
+
 **Preset groups** feed the same flow: the "New group" sheet (`components/new-group-sheet.tsx`) fetches admin-curated `preset_groups` rows via `lib/presets.ts` (direct Supabase read; RLS grants select to authenticated users), and picking one creates a plain local group and pushes its word list through `addWordsFromText()` — so preset words enrich, sync, and behave exactly like pasted words, with no lasting link to the preset ("already added" is detected by name).
 
 **Photo scan** feeds the same flow. The in-app camera (`components/camera-capture.tsx`, so Android doesn't kill the PWA while a system camera is open) or a picked file is decoded and downscaled once (`lib/image.ts`, ≤1600px, EXIF-safe), then goes vision-first:
@@ -83,6 +85,8 @@ photo → downscale on canvas (lib/image.ts, shared with OCR)
 ```
 
 The AI steps are server-side only (`lib/ai.ts` returns `null` on failure so callers fall back); the Groq key never reaches the client. Local-only and signed-out scans skip both uploads and stay fully on-device.
+
+Scans are capped at **40 word entries and 20 sentence entries**, counted separately. The caps and the word-vs-sentence classifier (`isSentence`: four or more tokens, or a short entry ending in sentence punctuation) live in `lib/scan-rules.ts`, a pure module imported by both the AI routes (prompt limits + parse truncation) and the add-words sheet (which reports which limit a too-busy photo exceeded).
 
 ### 2. Sync (lib/sync.ts)
 
@@ -117,6 +121,7 @@ startPlaylist(words, title)
 
 - `cloudConfigured()` false → no gate, local-only mode (dev convenience)
 - Otherwise: session restoring → cinematic splash covers the screen; restored & signed out → redirect to `/login`; signed in → app renders and `syncNow()` fires
+- The login page offers email/password and Google. Google uses `supabase.auth.signInWithOAuth` (full-page redirect to Google and back to `/login`); the returning session is consumed from the URL by the Supabase client and lands through the same `onAuthStateChange` listener, so gating and sync-on-login need no special casing. The provider must be enabled in the Supabase dashboard with a Google Cloud OAuth client
 - The splash plays fully once per session (`sessionStorage`), and on reloads is removed pre-paint (layout effect) so navigation never flashes it
 - `/admin` bypasses the shell entirely — it has its own layout and server-verified guard
 
@@ -137,7 +142,7 @@ The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with 
 
 ### 7. AI routes (src/app/api/ai/*)
 
-Two non-admin server routes accept requests from **any signed-in user** (bearer token verified via the service-role client, no allowlist) and share their plumbing in `src/app/api/ai/_shared.ts` (auth, `app_settings` read, Groq call, word-list parsing). `/api/ai/extract-words-image` takes a downscaled JPEG data URL and asks the configured vision model (default Llama 4 Scout, key `groq_vision_model`) for a JSON list of vocabulary entries read straight off the photo. `/api/ai/extract-words` takes raw OCR text and asks the text model (default Llama 3.3, key `groq_model`) to clean it up. Both run at temperature 0 with capped input and output, 25/20-second timeouts, and prompts forbidding invented words. Every failure mode returns a non-200 status; the client helpers (`lib/ai.ts`) convert any of them to `null`, which callers treat as "use the next fallback" (vision → on-device OCR + text cleanup → heuristics). This means AI outages degrade the scan quality, never break the feature.
+Two non-admin server routes accept requests from **any signed-in user** (bearer token verified via the service-role client, no allowlist) and share their plumbing in `src/app/api/ai/_shared.ts` (auth, `app_settings` read, Groq call, word-list parsing). `/api/ai/extract-words-image` takes a downscaled JPEG data URL and asks the configured vision model (default Llama 4 Scout, key `groq_vision_model`) for a JSON list of vocabulary entries read straight off the photo. `/api/ai/extract-words` takes raw OCR text and asks the text model (default Llama 3.3, key `groq_model`) to clean it up. Both run at temperature 0 with capped input and output, 25/20-second timeouts, prompts forbidding invented words, and per-kind entry caps (40 words / 20 sentences, shared with the client via `lib/scan-rules.ts`). Every failure mode returns a non-200 status; the client helpers (`lib/ai.ts`) convert any of them to `null`, which callers treat as "use the next fallback" (vision → on-device OCR + text cleanup → heuristics). This means AI outages degrade the scan quality, never break the feature.
 
 ## Key technical decisions
 

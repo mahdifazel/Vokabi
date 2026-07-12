@@ -6,8 +6,8 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 
 ## Features
 
-- **Bulk word adding** — paste one word or a whole list; `das Haus`-style articles are detected automatically
-- **Photo scan** — point the camera at a book page or word list (or pick a photo); a Groq vision model (Llama 4 Scout) reads the vocabulary straight off the photo, including handwriting. When AI is unavailable the scan falls back automatically to on-device Tesseract.js OCR with Groq text cleanup, and finally to heuristic detection, so it always works, even offline
+- **Bulk word adding** — paste one word or a whole list, one per line or separated by `/` or a spaced `-`; `das Haus`-style articles are detected automatically, and commas stay part of the entry so plural notes like `die Katze, -n` and full sentences survive
+- **Photo scan** — point the camera at a book page or word list (or pick a photo); a Groq vision model (Llama 4 Scout) reads the vocabulary straight off the photo, including handwriting. When AI is unavailable the scan falls back automatically to on-device Tesseract.js OCR with Groq text cleanup, and finally to heuristic detection, so it always works, even offline. Each scan accepts up to 40 words and 20 sentences
 - **Automatic dictionary** — article (🔵 der / 🔴 die / 🟢 das), English translation, plural, IPA, and part of speech via a bundled ~300-word offline seed dictionary → Wiktionary → translation-API fallback, cached in IndexedDB
 - **Native pronunciation** — best available German system voice (Google natural voices on Android, Anna on iOS), voice picker, 0.5–1.5× speed, slow-play button
 - **Listening playlists** — play a group with configurable pause (0–5 s), repeat count (1–5×), read-article and read-translation toggles, shuffle, endless loop; a floating player card shows the current word in large type with its translation and centered controls
@@ -18,7 +18,7 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 - **Quiz** — multiple choice: German→English, English→German, and der/die/das article questions with audio feedback
 - **Organization** — groups (with a default **General** group), favorites, instant global search, word details with examples and notes; "New group" offers a custom name or a searchable list of **ready-made groups** curated in the back office (added with their words in one tap); deleting a group lets you keep its words or delete them too (words shared with other groups are never deleted)
 - **Import / export** — TXT/CSV import, CSV/JSON export
-- **Accounts & sync** — email/password login (Supabase); words sync across devices, protected by Postgres row-level security; offline-first so everything works without a connection
+- **Accounts & sync** — email/password or Google login (Supabase); words sync across devices, protected by Postgres row-level security; offline-first so everything works without a connection
 - **PWA** — installable on Android, offline service worker, dark (default)/light/system theme, cinematic once-per-session splash
 - **Admin back office** (`/admin`) — sidebar layout with light/dark toggle, user management (ban/delete/reset password), feedback inbox, announcement banners, preset groups (curated word lists users can add from the app), email broadcast, and System settings (Groq AI key plus vision/text model ids, stored server-side and editable without a redeploy)
 
@@ -60,6 +60,7 @@ EMAIL_FROM="Vokabi <hello@yourdomain.com>"
 
 5. Restart the dev server. The app now requires login; sign up with an email listed in `ADMIN_EMAILS` to get the **Back office** button in Settings.
 6. Optional, for AI photo scanning: open **Back office → System settings** and save your Groq API key (get one free at [console.groq.com](https://console.groq.com)). With it, scanned photos are read by a Groq vision model; without it, photo scans still work using on-device OCR with heuristic word detection.
+7. Optional, for **Google sign-in**: create a Google OAuth client and enable the Google provider in Supabase (see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)). Without it the login page offers email/password only.
 
 For production deployment see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
