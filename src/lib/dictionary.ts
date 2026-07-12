@@ -28,6 +28,7 @@ export interface ParsedInput {
 export function parseInput(raw: string): ParsedInput | null {
   const cleaned = raw
     .replace(/[\d.)\-–—•*]+\s*/g, (m, offset) => (offset === 0 ? "" : m)) // strip list bullets/numbering at start
+    .replace(/^,+|,+$/g, "") // commas no longer split entries; drop stray ones at the edges
     .replace(/\s+/g, " ")
     .trim();
   if (!cleaned) return null;
@@ -41,9 +42,14 @@ export function parseInput(raw: string): ParsedInput | null {
   return { german: cleaned };
 }
 
-/** Split a pasted blob into individual word inputs (newlines, commas, semicolons) */
+/**
+ * Split a pasted blob into individual word inputs: newlines, semicolons,
+ * slashes, or a dash with a space on both sides. Commas stay part of the
+ * entry so "die Katze, -n" and sentences survive; a bare dash never splits
+ * ("E-Mail", the plural shorthand "-n").
+ */
 export function splitWordList(text: string): ParsedInput[] {
-  const parts = text.split(/[\n,;]+/);
+  const parts = text.split(/[\n;/]+|\s+[-–—]+\s+/);
   const seen = new Set<string>();
   const out: ParsedInput[] = [];
   for (const part of parts) {

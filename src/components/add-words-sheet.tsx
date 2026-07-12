@@ -152,8 +152,8 @@ export function AddWordsSheet({
   return (
     <Sheet open={open} onClose={onClose} title="Add words">
       <p className="mb-3 text-sm font-semibold text-muted">
-        Paste one word or a whole list, one per line. Articles like “das Haus” are detected;
-        translations are added automatically.
+        Paste one word or a whole list, one per line or separated by / or -. Articles like
+        “das Haus” are detected; translations are added automatically.
       </p>
       <Textarea
         rows={6}
