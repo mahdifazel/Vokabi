@@ -25,9 +25,9 @@ Rules:
 - Only include words and sentences actually visible in the photo; never invent entries.
 - Read handwriting carefully; if a word is partly unclear, pick the plausible German word it most likely is, but skip anything you cannot read with confidence.
 - For nouns, keep the article (der/die/das) when it is written next to the noun; do not add articles that are not there.
-- Keep a full example sentence as one single entry.
+- Include full sentences too: keep every example sentence as one single entry, exactly as written. Never split a sentence into separate words, shorten it or leave it out.
 - Drop translations in other languages, page numbers, chapter headers, exercise instructions and decorations.
-- No duplicates. At most ${MAX_SCAN_WORDS} single words or short phrases, and at most ${MAX_SCAN_SENTENCES} full sentences.
+- No duplicates. Include up to ${MAX_SCAN_WORDS} word entries and up to ${MAX_SCAN_SENTENCES} sentence entries.
 - If the photo contains no German vocabulary, respond with {"words": []}.`;
 
 export async function POST(req: Request) {
