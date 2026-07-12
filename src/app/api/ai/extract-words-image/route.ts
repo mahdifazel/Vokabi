@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       settings.apiKey,
       {
         model: settings.visionModel,
-        max_tokens: 2048,
+        max_tokens: 1024,
         messages: [
           {
             role: "user",

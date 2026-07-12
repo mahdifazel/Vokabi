@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       settings.apiKey,
       {
         model: settings.model,
-        max_tokens: 2048,
+        max_tokens: 1024,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: text.slice(0, MAX_INPUT_CHARS) },

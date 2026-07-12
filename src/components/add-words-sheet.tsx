@@ -122,9 +122,9 @@ export function AddWordsSheet({
 
       if (words.length === 0) {
         setScanError("No words found in that photo. Try a sharper, closer picture.");
-      } else if (words.length > 40) {
+      } else if (words.length > 20) {
         setScanError(
-          "Your image contains more than 40 words or sentences. Please take a new picture with fewer items."
+          "Your image contains more than 20 words or sentences. Please take a new picture with fewer items."
         );
       } else {
         setText((t) => (t ? t + "\n" + words.join("\n") : words.join("\n")));
