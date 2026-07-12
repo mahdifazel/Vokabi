@@ -4,8 +4,8 @@ import {
   callGroqChat,
   loadGroqSettings,
   parseWordList,
-  MAX_WORDS,
 } from "../_shared";
+import { MAX_SCAN_SENTENCES, MAX_SCAN_WORDS } from "@/lib/scan-rules";
 
 /**
  * Extracts German vocabulary straight from a scanned photo using a Groq
@@ -27,7 +27,7 @@ Rules:
 - For nouns, keep the article (der/die/das) when it is written next to the noun; do not add articles that are not there.
 - Keep a full example sentence as one single entry.
 - Drop translations in other languages, page numbers, chapter headers, exercise instructions and decorations.
-- No duplicates. At most ${MAX_WORDS} entries.
+- No duplicates. At most ${MAX_SCAN_WORDS} single words or short phrases, and at most ${MAX_SCAN_SENTENCES} full sentences.
 - If the photo contains no German vocabulary, respond with {"words": []}.`;
 
 export async function POST(req: Request) {
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       settings.apiKey,
       {
         model: settings.visionModel,
-        max_tokens: 1024,
+        max_tokens: 2048,
         messages: [
           {
             role: "user",

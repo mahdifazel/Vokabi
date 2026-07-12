@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { serviceClient } from "@/lib/admin/server";
+import { isSentence, MAX_SCAN_SENTENCES, MAX_SCAN_WORDS } from "@/lib/scan-rules";
 
 /**
  * Shared plumbing for the /api/ai/* routes (available to any signed-in user,
@@ -11,7 +12,6 @@ import { serviceClient } from "@/lib/admin/server";
 
 export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 export const DEFAULT_GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
-export const MAX_WORDS = 20;
 
 /** Verify the caller's Supabase session; any signed-in user passes. */
 export async function authenticateUser(
@@ -106,18 +106,30 @@ export async function callGroqChat(
   return { content: json.choices?.[0]?.message?.content ?? "" };
 }
 
-/** Parse the model's {"words": [...]} JSON into a deduped, capped word list. */
+/**
+ * Parse the model's {"words": [...]} JSON into a deduped word list, capped
+ * separately per kind: MAX_SCAN_WORDS vocabulary items, MAX_SCAN_SENTENCES
+ * example sentences.
+ */
 export function parseWordList(content: string): string[] {
   const parsed = JSON.parse(content) as { words?: unknown };
   const seen = new Set<string>();
   const words: string[] = [];
+  let wordCount = 0;
+  let sentenceCount = 0;
   for (const entry of Array.isArray(parsed.words) ? parsed.words : []) {
     if (typeof entry !== "string") continue;
     const word = entry.trim();
     if (!word || seen.has(word.toLowerCase())) continue;
+    if (isSentence(word)) {
+      if (sentenceCount >= MAX_SCAN_SENTENCES) continue;
+      sentenceCount++;
+    } else {
+      if (wordCount >= MAX_SCAN_WORDS) continue;
+      wordCount++;
+    }
     seen.add(word.toLowerCase());
     words.push(word);
-    if (words.length >= MAX_WORDS) break;
   }
   return words;
 }

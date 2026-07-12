@@ -9,6 +9,7 @@ import { splitWordList } from "@/lib/dictionary";
 import { ocrSupported, recognizeGerman, type OcrProgress } from "@/lib/ocr";
 import { extractWordsFromImageWithAi, extractWordsWithAi } from "@/lib/ai";
 import { downscaleToCanvas } from "@/lib/image";
+import { isSentence, MAX_SCAN_SENTENCES, MAX_SCAN_WORDS } from "@/lib/scan-rules";
 import type { Group } from "@/lib/types";
 import { Button, Sheet, Textarea, cn } from "./ui";
 import { CameraCapture } from "./camera-capture";
@@ -120,11 +121,17 @@ export function AddWordsSheet({
         if (!words) words = lines;
       }
 
+      const sentenceCount = words.filter(isSentence).length;
+      const wordCount = words.length - sentenceCount;
       if (words.length === 0) {
         setScanError("No words found in that photo. Try a sharper, closer picture.");
-      } else if (words.length > 20) {
+      } else if (wordCount > MAX_SCAN_WORDS) {
         setScanError(
-          "Your image contains more than 20 words or sentences. Please take a new picture with fewer items."
+          `Your image contains more than ${MAX_SCAN_WORDS} words. Please take a new picture with fewer items.`
+        );
+      } else if (sentenceCount > MAX_SCAN_SENTENCES) {
+        setScanError(
+          `Your image contains more than ${MAX_SCAN_SENTENCES} sentences. Please take a new picture with fewer items.`
         );
       } else {
         setText((t) => (t ? t + "\n" + words.join("\n") : words.join("\n")));
