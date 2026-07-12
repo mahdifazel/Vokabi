@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Google sign-in** - a "Continue with Google" button on the login page (Supabase OAuth redirect flow). Requires enabling the Google provider in the Supabase dashboard with a Google Cloud OAuth client; a Google sign-in with the same verified email is linked automatically to an existing email/password account. OAuth errors surface in the login form's message box
 - The Vokabi logo is served as static assets at `/vokabi-logo.svg` and `/vokabi-logo.png` (512px, transparent-corner render of the app mark)
+- Google Search Console ownership verification file at `/google1d97262e1371303f.html` (must stay in place; Google re-checks it)
 
 ### Changed
 

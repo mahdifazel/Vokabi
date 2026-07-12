@@ -111,6 +111,8 @@ src/
     admin/client.ts        adminFetch + admin row types
 public/
   manifest.webmanifest, sw.js (hand-written service worker), icon.svg
+  vokabi-logo.svg/.png      Static brand assets (512px PNG render of the app mark)
+  google1d97262e1371303f.html   Google Search Console ownership proof — never remove
   ocr/                      Tesseract worker/wasm/German model (copied on postinstall)
 scripts/
   copy-ocr-assets.mjs       Copies Tesseract assets into public/ocr (postinstall)

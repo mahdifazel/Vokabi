@@ -6,6 +6,7 @@
 |---|---|---|
 | Hosting | Vercel | Project connected to the `mahdifazel/Vokabi` GitHub repo |
 | Domain | https://vokabi.app | Custom domain on the Vercel project |
+| Search Console | Google Search Console | Ownership proven by `public/google1d97262e1371303f.html`; Google re-checks it periodically, so the file must never be removed |
 | Database + auth | Supabase (single project) | Also linked via the Vercel↔Supabase integration, which injects the `NEXT_PUBLIC_SUPABASE_*` variables |
 | Email (auth mails) | Supabase built-in mailer | ⚠️ Heavily rate-limited (~a few/hour); "Confirm email" is disabled for this reason. Configure custom SMTP before relying on password-reset emails at scale |
 | Email (broadcasts) | Resend (optional) | Only used by the admin Email tab |
