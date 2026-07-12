@@ -11,7 +11,7 @@ import { serviceClient } from "@/lib/admin/server";
 
 export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 export const DEFAULT_GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
-export const MAX_WORDS = 20;
+export const MAX_WORDS = 40;
 
 /** Verify the caller's Supabase session; any signed-in user passes. */
 export async function authenticateUser(
