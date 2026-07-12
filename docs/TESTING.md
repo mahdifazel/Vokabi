@@ -20,10 +20,11 @@ Until automated coverage exists, changes are verified against the affected flows
 **Words & dictionary**
 - [ ] Add a single word ("Haus") → article/translation/plural/IPA appear within seconds
 - [ ] Bulk paste with mixed forms (`der Baum`, lowercase noun, a verb) → parsed, deduplicated, enriched
+- [ ] Separators: entries split on newlines, `;`, `/`, and a spaced `-`; a comma stays inside the entry ("die Katze, -n" is one word) and "E-Mail" never splits
 - [ ] Add an obscure word offline → status "no translation found"; Settings → *Retry lookups* fixes it once online
 - [ ] Edit a word manually; delete a word
 - [ ] Open a verb (e.g. "gehen", "aufstehen", "sich freuen") → example with playback, Perfekt with sein/haben chip, collapsible conjugation and grammar sections; nouns/adjectives show none of these
-- [ ] Photo scan: "Scan a photo" opens the in-app camera (or file picker without camera permission); a clear printed word list yields clean entries in the textarea; with the Groq key configured the "Identifying words" phase runs; with the key removed the scan still works (heuristic fallback)
+- [ ] Photo scan: "Scan a photo" opens the in-app camera (or file picker without camera permission); a clear printed word list yields clean entries in the textarea; with the Groq key configured the "Identifying words" phase runs; with the key removed the scan still works (heuristic fallback); scans keep sentences whole and are capped at 40 words / 20 sentences with a matching error message
 - [ ] Delete a group that contains words → its words appear in General, not lost
 - [ ] Add-words sheet from the Library page has the first group preselected; from a group page that group is targeted
 
@@ -41,6 +42,7 @@ Until automated coverage exists, changes are verified against the affected flows
 **Accounts & sync**
 - [ ] Signed out (configured deployment) → any URL redirects to `/login`
 - [ ] Sign up, sign in, sign out; wrong password shows a readable error
+- [ ] "Continue with Google" completes the OAuth round-trip and lands signed in with sync running (needs the Google provider configured in Supabase); with the provider disabled the error appears in the message box
 - [ ] Add word on device A → appears on device B after sync; delete on B → disappears on A
 - [ ] New account gets a "General" group exactly once (check a second device too)
 
@@ -64,6 +66,7 @@ If/when tests are added, the natural fit for this codebase:
 
 1. **Unit tests (Vitest)** — highest value-per-effort targets are the pure logic modules:
    - `lib/dictionary.ts` — `parseInput`, `splitWordList`, wikitext parsing (`parseGermanWikitext`, `parseDeNounTemplate` — fixture-friendly), plural resolution, umlaut stems
+   - `lib/scan-rules.ts` — `isSentence` word-vs-sentence classification against sample entries
    - `lib/speech.ts` — `scoreAttempt`, `levenshtein`, `charMatches`
    - `lib/learn.ts` — `buildQuiz` option/correctness invariants
    - `lib/verbs.ts` — `getVerbInfo` conjugation/Perfekt against a table of known-good verbs (pure functions, ideal fixture target)

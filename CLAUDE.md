@@ -17,7 +17,7 @@ Guidance for AI assistants and new developers working in this repository.
 | Animation | Framer Motion 12 | |
 | Icons | lucide-react | Never use emoji as UI icons |
 | Local DB | Dexie 4 (IndexedDB) + dexie-react-hooks (`useLiveQuery`) | Source of truth on-device |
-| Cloud | Supabase (`@supabase/supabase-js` v2) | Auth (email/password) + Postgres with row-level security |
+| Cloud | Supabase (`@supabase/supabase-js` v2) | Auth (email/password + Google OAuth) + Postgres with row-level security |
 | Speech | Web Speech API | `speechSynthesis` for TTS, `webkitSpeechRecognition` for practice scoring |
 | Fonts | Nunito (body) + Baloo 2 (display) via `next/font/google` | CSS vars `--font-nunito`, `--font-baloo`; `h1`/`h2` use the display face (rule in `globals.css`) |
 | Hosting | Vercel | Auto-deploys from `main`; custom domain vokabi.app |
@@ -99,6 +99,7 @@ src/
     ocr.ts                 On-device OCR (Tesseract.js, German), the scan fallback
     image.ts               Shared photo decode/downscale + JPEG encoding for scans
     ai.ts                  Clients for /api/ai/* routes (null on failure = use fallback)
+    scan-rules.ts          Shared scan caps (40 words / 20 sentences) + word-vs-sentence classifier
     player.ts              Playlist engine + Media Session
     tts.ts / speech.ts     Speech synthesis / recognition scoring
     keepalive.ts           Silent-audio loop for background playback
@@ -126,7 +127,7 @@ docs/                       Architecture, decisions, deployment, testing
 - **Client vs server**: everything under `src/app` (except `api/`) is client components (`"use client"`). Only `api/admin/*`, `api/ai/*` and `lib/admin/server.ts` run on the server.
 - **ESLint is strict about React**: no synchronous `setState` in effect bodies (use timers/microtasks or restructure), no ref reads during render. `npm run lint` must be clean before committing.
 - **Copy style**: user-facing text is friendly, concise, sentence case ("Add your first words", "Got it").
-- **Word data**: `favorite` is `0 | 1` (Dexie can't index booleans). `groupIds` is a multiEntry index. German nouns are auto-capitalized in `buildWord`.
+- **Word data**: `favorite` is `0 | 1` (Dexie can't index booleans). `groupIds` is a multiEntry index. German nouns are auto-capitalized in `buildWord`. `splitWordList` separates pasted entries on newlines, semicolons, `/`, and a dash with spaces on both sides; commas never split (plural notes like "die Katze, -n" stay one entry).
 - After changing cached assets or fixing SW behavior, **bump `CACHE` in `public/sw.js`** (currently `vokabi-v13`) or clients keep the old version.
 
 ## Gotchas
@@ -139,5 +140,5 @@ docs/                       Architecture, decisions, deployment, testing
 - Every word must belong to a group: the Library page only shows group cards, so ungrouped words are invisible there. `ensureWordsGrouped()` (in `words.ts`) self-heals by re-homing orphans to "General"; it runs at startup, after sync pulls, and after group deletion. Don't create code paths that leave words ungrouped. Deleting a group offers two options: keep its words (re-homed) or delete them too — but words that also belong to other groups are never deleted, only detached.
 - The manifest `background_color` must match the dark theme background (`#0c0f1a`): Android's generated PWA launch screen uses it, and the in-app splash draws on that color, so they blend into one splash.
 - Playback diagnostics UI is intentionally hidden: 7 taps on the Settings footer reveal it. The logging itself always runs.
-- Supabase dashboard settings that matter and live outside the repo: Site URL (`https://vokabi.app`), redirect URLs, "Confirm email" disabled (built-in mailer has a very low hourly limit).
+- Supabase dashboard settings that matter and live outside the repo: Site URL (`https://vokabi.app`), redirect URLs, "Confirm email" disabled (built-in mailer has a very low hourly limit), and the Google OAuth provider (client ID/secret from a Google Cloud OAuth client; without it "Continue with Google" shows a provider-not-enabled error).
 - A stored session can be valid client-side but rejected server-side (rotated Supabase keys → "Invalid session"). Server 401s must clear the local session before redirecting to `/login`, or the login page bounces back (it redirects to `/` whenever a client-side user exists); the admin layout does this.

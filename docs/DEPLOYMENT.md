@@ -30,6 +30,7 @@
    - SQL Editor → run `supabase/schema.sql`, then `supabase/admin-schema.sql` (both are idempotent)
    - Authentication → URL Configuration: **Site URL** = your domain, add `https://<domain>/**` to Redirect URLs
    - Authentication → Sign In / Providers → Email: disable **Confirm email** (or configure custom SMTP first)
+   - Optional, **Google sign-in**: in [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Credentials, create an OAuth 2.0 Client ID (type: Web application) whose authorized redirect URI is the callback URL shown on the Supabase Google provider screen (`https://<project-ref>.supabase.co/auth/v1/callback`), and publish the OAuth consent screen. Then Authentication → Sign In / Providers → Google: enable and paste the client ID/secret. Without this the "Continue with Google" button shows a provider-not-enabled error; a Google sign-in with the same verified email is linked automatically to an existing email/password account
 3. **Vercel**
    - Import the GitHub repo (framework auto-detected: Next.js; no build settings to change)
    - Settings → Environment Variables:

@@ -75,6 +75,20 @@ export async function signUp(email: string, password: string): Promise<string | 
   return null;
 }
 
+/**
+ * Starts the Google OAuth redirect; only returns on failure. The session
+ * lands via onAuthStateChange after Supabase redirects back to the app.
+ */
+export async function signInWithGoogle(): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return "Cloud sync is not configured.";
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${window.location.origin}/login` },
+  });
+  return error ? error.message : null;
+}
+
 export async function signOut() {
   await getSupabase()?.auth.signOut();
 }

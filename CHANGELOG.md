@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [1.5.0] - 2026-07-12
+
+### Added
+
+- **Google sign-in** - a "Continue with Google" button on the login page (Supabase OAuth redirect flow). Requires enabling the Google provider in the Supabase dashboard with a Google Cloud OAuth client; a Google sign-in with the same verified email is linked automatically to an existing email/password account. OAuth errors surface in the login form's message box
+- The Vokabi logo is served as static assets at `/vokabi-logo.svg` and `/vokabi-logo.png` (512px, transparent-corner render of the app mark)
+
+### Changed
+
+- **Photo scans accept up to 40 words**; sentences keep their previous limit of 20. The two kinds are counted separately with a shared classifier (`lib/scan-rules.ts`: four or more tokens, or a short entry with sentence punctuation, counts as a sentence), the AI routes prompt for and truncate to the per-kind caps, and the scan error message says which limit was exceeded
+- **Commas no longer split pasted text into separate words**, so entries like "die Katze, -n" and sentences containing commas stay whole. Entries are separated by newlines, semicolons, `/`, or a dash surrounded by spaces (a bare dash never splits, protecting "E-Mail" and the plural shorthand "-n"); the add-words sheet explains the separators
+
 ## [1.4.0] — 2026-07-12
 
 ### Changed

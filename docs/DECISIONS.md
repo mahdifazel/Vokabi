@@ -17,7 +17,7 @@ Why Vokabi is built the way it is. Each entry: context → decision → trade-of
 ## 3. Supabase for auth + storage
 
 **Context:** "Users must log in and have their own words" — needed auth, a database, and per-user isolation, with zero server maintenance and a free tier.
-**Decision:** Supabase email/password auth + Postgres with row-level security (`auth.uid() = user_id` policies on every table).
+**Decision:** Supabase auth (email/password, plus Google OAuth on the login page) + Postgres with row-level security (`auth.uid() = user_id` policies on every table).
 **Trade-offs:** Security is enforced *in the database*, so even a compromised client can't read others' data. Vendor lock-in is limited (plain Postgres). Rejected: Firebase (NoSQL modeling, heavier SDK), custom backend (maintenance cost).
 
 ## 4. Web Speech API for TTS — no audio backend
