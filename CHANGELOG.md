@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Export/import now round-trips groups.** CSV exports gain a `groups` column (names separated by `|`) and JSON exports carry group names per word plus the full group list, so empty groups survive too. Importing (the file picker now also accepts `.json`) creates any groups that don't exist yet, matched case-insensitively by name, and files every word into its groups; words without group info fall back to the previous behavior. JSON exports no longer include device/sync internals (`uid`, `dirty`, local ids)
 
-- **Default preset groups.** Presets can be flagged as default in the back office (star toggle on the row, switch in the create form); after a sync pull the app seeds unseen default presets into the user's library as normal groups. Processed preset ids are tracked per account in localStorage so a deleted default group stays deleted on that device. Requires the new `is_default` column (rerun `supabase/admin-schema.sql`)
+- **Default preset groups.** Presets can be flagged as default in the back office (star toggle on the row, switch in the create form); after a sync pull the app seeds unseen default presets into the user's library as normal groups, and unflagging or deleting the preset removes the seeded group again on the next pass (words shared with other groups are kept). Processed preset ids and the created group uids are tracked per account in localStorage, so removal never touches a user's own groups and a user-deleted default group stays deleted on that device. Requires the new `is_default` column (rerun `supabase/admin-schema.sql`)
 
 ### Changed
 

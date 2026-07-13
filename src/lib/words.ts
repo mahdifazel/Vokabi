@@ -131,13 +131,53 @@ export async function ensureWordsGrouped() {
 }
 
 /**
+ * Per-account record of default presets this device has processed:
+ * preset id → uid of the group the seeding created, or null when the name
+ * already existed (user's own group or a copy synced from another device).
+ * Only groups we created ourselves (non-null uid) are auto-removed when the
+ * admin unflags or deletes the preset.
+ */
+type SeededRecord = Record<string, string | null>;
+
+async function loadSeededRecord(
+  key: string,
+  presets: { id: string; name: string; isDefault: boolean }[]
+): Promise<{ record: SeededRecord; migrated: boolean }> {
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(localStorage.getItem(key) ?? "null");
+  } catch {
+    // fall through to empty record
+  }
+  if (Array.isArray(parsed)) {
+    // legacy format (a bare list of preset ids) didn't record which group the
+    // seeding created; adopt the same-named local group so unflagging works
+    const record: SeededRecord = {};
+    for (const id of parsed) {
+      if (typeof id !== "string") continue;
+      const preset = presets.find((p) => p.id === id);
+      const nameKey = preset?.name.trim().toLowerCase();
+      const group = nameKey
+        ? await db.groups.filter((g) => g.name.trim().toLowerCase() === nameKey).first()
+        : undefined;
+      record[id] = group?.uid ?? null;
+    }
+    return { record, migrated: true };
+  }
+  if (parsed && typeof parsed === "object") {
+    return { record: parsed as SeededRecord, migrated: false };
+  }
+  return { record: {}, migrated: false };
+}
+
+/**
  * Preset groups the admin marked as default appear in everyone's library
- * automatically. Each one is materialized once per account and device
- * (seen ids tracked in localStorage), so a user who deletes a default group
- * doesn't get it back on this device. Runs after a sync pull, so groups that
- * already synced from another device win the name check and are only marked
- * as seen. Best effort: when the fetch fails (offline), we retry on the next
- * app start.
+ * automatically, and disappear again when the admin unflags or deletes the
+ * preset. Each preset is materialized once per account and device, so a user
+ * who deletes a default group doesn't get it back on this device. Runs after
+ * a sync pull, so groups that already synced from another device win the
+ * name check and are only marked as processed (never removed). Best effort:
+ * when the fetch fails (offline), we retry on the next app start.
  */
 let presetSeedDone = false;
 export async function seedDefaultPresetGroups() {
@@ -147,34 +187,42 @@ export async function seedDefaultPresetGroups() {
   const presets = await fetchPresetGroups();
   if (!presets) return;
   presetSeedDone = true;
-  const defaults = presets.filter((p) => p.isDefault);
-  if (defaults.length === 0) return;
 
   const key = `vokabi.seededPresets.${user.id}`;
-  let stored: unknown;
-  try {
-    stored = JSON.parse(localStorage.getItem(key) ?? "[]");
-  } catch {
-    stored = [];
-  }
-  const seen = new Set<string>(Array.isArray(stored) ? (stored as string[]) : []);
+  const { record, migrated } = await loadSeededRecord(key, presets);
+  let changed = migrated;
 
+  // remove copies we created for presets that are no longer default
+  const defaultIds = new Set(presets.filter((p) => p.isDefault).map((p) => p.id));
+  for (const [presetId, groupUid] of Object.entries(record)) {
+    if (defaultIds.has(presetId)) continue;
+    if (groupUid) {
+      const group = await db.groups.where("uid").equals(groupUid).first();
+      // words only in this group go with it; words in other groups are kept
+      if (group?.id != null) await deleteGroupAndWords(group.id);
+    }
+    delete record[presetId];
+    changed = true;
+  }
+
+  // seed defaults this account hasn't processed yet
   const names = new Set((await db.groups.toArray()).map((g) => g.name.trim().toLowerCase()));
-  let changed = false;
-  for (const p of defaults) {
-    if (seen.has(p.id)) continue;
+  for (const p of presets) {
+    if (!p.isDefault || p.id in record) continue;
     const nameKey = p.name.trim().toLowerCase();
-    if (!names.has(nameKey)) {
+    if (names.has(nameKey)) {
+      record[p.id] = null;
+    } else {
       const id = (await db.groups.add({ name: p.name, createdAt: Date.now() })) as number;
+      record[p.id] = (await db.groups.get(id))?.uid ?? null;
       if (p.words.length > 0) {
         await addWordsFromText(p.words.join("\n"), [id]);
       }
       names.add(nameKey);
     }
-    seen.add(p.id);
     changed = true;
   }
-  if (changed) localStorage.setItem(key, JSON.stringify([...seen]));
+  if (changed) localStorage.setItem(key, JSON.stringify(record));
 }
 
 /** Retry enrichment for words that previously failed (e.g. added offline) */
