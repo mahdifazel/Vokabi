@@ -7,7 +7,7 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 ## Features
 
 - **Bulk word adding** — paste one word or a whole list, one per line or separated by `/` or a spaced `-`; `das Haus`-style articles are detected automatically, and commas stay part of the entry so plural notes like `die Katze, -n` and full sentences survive
-- **Photo scan** — point the camera at a book page or word list (or pick a photo); a Groq vision model (Qwen 3.6) reads the vocabulary straight off the photo, including handwriting. When AI is unavailable or rate-limited the scan falls back automatically to on-device Tesseract.js OCR with Groq text cleanup, and finally to heuristic detection — and says so, so degraded results are never silent. It always works, even offline. Each scan accepts up to 40 words and 20 sentences
+- **Photo scan** — point the camera at a book page or word list (or pick a photo); a vision model reads the vocabulary straight off the photo, including handwriting (Gemini first, a Groq vision model as fallback). When AI is unavailable or rate-limited the scan falls back automatically to on-device Tesseract.js OCR with AI text cleanup, and finally to heuristic detection — and says so, so degraded results are never silent. It always works, even offline. Each scan accepts up to 40 words and 20 sentences
 - **Automatic dictionary** — article (🔵 der / 🔴 die / 🟢 das), English translation, plural, IPA, and part of speech via a bundled ~300-word offline seed dictionary → Wiktionary → translation-API fallback, cached in IndexedDB
 - **Native pronunciation** — best available German system voice (Google natural voices on Android, Anna on iOS), voice picker, 0.5–1.5× speed, slow-play button
 - **Listening playlists** — play a group with configurable pause (0–5 s), repeat count (1–5×), read-article and read-translation toggles, shuffle, endless loop; a floating player card shows the current word in large type with its translation and centered controls
@@ -20,14 +20,14 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 - **Import / export** — TXT/CSV/JSON import, CSV/JSON export; both formats carry group membership, so importing on another account recreates missing groups and files every word into the right ones
 - **Accounts & sync** — email/password or Google login (Supabase); words sync across devices, protected by Postgres row-level security; offline-first so everything works without a connection
 - **PWA** — installable on Android, offline service worker, dark (default)/light/system theme, cinematic once-per-session splash
-- **Admin back office** (`/admin`) — sidebar layout with light/dark toggle, user management (ban/delete/reset password), feedback inbox, announcement banners, preset groups (curated word lists users can add from the app; those flagged default are seeded into every library and removed again when unflagged), email broadcast, and System settings (Groq AI key plus vision/text model ids, stored server-side and editable without a redeploy)
+- **Admin back office** (`/admin`) — sidebar layout with light/dark toggle, user management (ban/delete/reset password), feedback inbox, announcement banners, preset groups (curated word lists users can add from the app; those flagged default are seeded into every library and removed again when unflagged), email broadcast, and System settings (Gemini and Groq AI keys plus model ids, stored server-side and editable without a redeploy)
 
 ## Prerequisites
 
 - **Node.js 18+** (developed on Node 24) and npm
 - Optional, for accounts/sync/admin: a free [Supabase](https://supabase.com) project
 - Optional, for admin email broadcasts: a [Resend](https://resend.com) account
-- Optional, for AI-assisted photo scanning: a free [Groq](https://console.groq.com) API key (entered in the back office, not an env var)
+- Optional, for AI-assisted photo scanning: a [Gemini](https://aistudio.google.com) API key and/or a free [Groq](https://console.groq.com) API key (entered in the back office; the Gemini key can also be set as the `GEMINI_API_KEY` env var)
 
 ## Installation
 
@@ -59,7 +59,7 @@ EMAIL_FROM="Vokabi <hello@yourdomain.com>"
 ```
 
 5. Restart the dev server. The app now requires login; sign up with an email listed in `ADMIN_EMAILS` to get the **Back office** button in Settings.
-6. Optional, for AI photo scanning: open **Back office → System settings** and save your Groq API key (get one free at [console.groq.com](https://console.groq.com)). With it, scanned photos are read by a Groq vision model; without it, photo scans still work using on-device OCR with heuristic word detection.
+6. Optional, for AI photo scanning: open **Back office → System settings** and save a Gemini API key ([aistudio.google.com](https://aistudio.google.com), tried first) and/or a Groq API key ([console.groq.com](https://console.groq.com), the fallback). With one configured, scanned photos are read by a vision model; without any, photo scans still work using on-device OCR with heuristic word detection.
 7. Optional, for **Google sign-in**: create a Google OAuth client and enable the Google provider in Supabase (see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)). Without it the login page offers email/password only.
 
 For production deployment see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).

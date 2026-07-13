@@ -4,11 +4,12 @@ import { canvasToJpegDataUrl } from "./image";
 import { getSupabase } from "./supabase";
 
 /**
- * Clients for the server-side AI routes (Groq, configured in the back
- * office). Every helper returns null whenever AI cannot be used — local-only
- * mode, signed out, key not configured, Groq down, or timeout — so callers
- * can fall back to the next on-device step. An empty array is a real answer:
- * the AI looked and found no vocabulary. Never throws.
+ * Clients for the server-side AI routes (Gemini first, Groq as fallback,
+ * configured in the back office). Every helper returns null whenever AI
+ * cannot be used — local-only mode, signed out, no key configured, providers
+ * down, or timeout — so callers can fall back to the next on-device step. An
+ * empty array is a real answer: the AI looked and found no vocabulary. Never
+ * throws.
  */
 
 async function getSessionToken(): Promise<string | null> {
@@ -18,7 +19,7 @@ async function getSessionToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
-/** "rate-limited" = Groq is busy; retrying in a minute will likely work. */
+/** "rate-limited" = the AI providers are busy; retrying in a minute will likely work. */
 export type AiWordsResult = string[] | "rate-limited" | null;
 
 async function postForWords(

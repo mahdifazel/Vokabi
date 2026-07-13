@@ -24,15 +24,16 @@ Vokabi is an **offline-first, client-heavy PWA** with a thin server layer used o
    ├─ Postgres: words, groups                │   plural, IPA, definitions)
    │   feedback, announcements,              └─ api.mymemory.translated.net
    │   app_settings (server-only KV:             (translation fallback)
-   │   Groq key/model),
+   │   Gemini/Groq keys + models),
    │   preset_groups (admin-curated,
    │   read-only for signed-in users)
    └─ Row-level security per user           External APIs (server-fetched)
-                                             └─ api.groq.com (vision: photo →
-  Vercel (hosting)                               words; text: OCR cleanup)
-   ├─ static client bundle + SSR shell
+                                             ├─ generativelanguage.googleapis.com
+  Vercel (hosting)                           │   (Gemini, tried first)
+   ├─ static client bundle + SSR shell       └─ api.groq.com (fallback)
    ├─ /api/admin/* route handlers ── service-role key + ADMIN_EMAILS
-   └─ /api/ai/* route handlers ───── any signed-in user; Groq key from app_settings
+   └─ /api/ai/* route handlers ───── any signed-in user; keys from app_settings
+                                     (the Gemini key also via GEMINI_API_KEY env)
 ```
 
 ## Folder structure
@@ -74,22 +75,23 @@ Enrichment is fire-and-forget browser work, so closing or backgrounding the app 
 
 ```
 photo → downscale on canvas (lib/image.ts, shared with OCR)
-      → JPEG data URL → POST /api/ai/extract-words-image (Groq vision model,
-                          key + model from app_settings): reads the vocabulary
-                          straight off the photo, incl. handwriting
+      → JPEG data URL → POST /api/ai/extract-words-image: reads the vocabulary
+                          straight off the photo, incl. handwriting.
+                          Gemini first → Groq vision model as fallback
+                          (keys + models from app_settings)
         ↳ an empty answer is trusted ("no vocabulary in this photo"), no fallback
-        ↳ on failure (no key, signed out, Groq down, rate limited, timeout),
-          fall back to the previous pipeline:
+        ↳ on failure (no keys, signed out, both providers down, rate limited,
+          timeout), fall back to the previous pipeline:
           Tesseract.js on-device (German model, assets self-hosted under /ocr/,
           cached offline after first download)
-          → raw text → POST /api/ai/extract-words (Groq text model):
+          → raw text → POST /api/ai/extract-words (same Gemini → Groq chain):
                          fixes OCR misreadings, keeps articles/sentences, drops noise
                        ↳ on ANY failure: heuristic fallback (confidence filter,
                          letter-ratio filter, hyphenation joining) in lib/ocr.ts
       → detected words land in the add-words textarea for review
 ```
 
-The AI steps are server-side only (`lib/ai.ts` returns `null` on failure and `"rate-limited"` on a Groq 429 so callers fall back; an empty array is a real answer). When a scan does fall back, the add-words sheet says so — a "scanner is busy, retry in a minute" notice for rate limits, a "basic recognition was used" notice otherwise — so degraded results are never silent. The Groq key never reaches the client. Local-only and signed-out scans skip both uploads and stay fully on-device.
+The AI steps are server-side only (`lib/ai.ts` returns `null` on failure and `"rate-limited"` on a 429 so callers fall back; an empty array is a real answer). When a scan does fall back, the add-words sheet says so — a "scanner is busy, retry in a minute" notice for rate limits, a "basic recognition was used" notice otherwise — so degraded results are never silent. The provider keys never reach the client. Local-only and signed-out scans skip both uploads and stay fully on-device.
 
 Scans are capped at **40 word entries and 20 sentence entries**, counted separately. The caps and the word-vs-sentence classifier (`isSentence`: four or more tokens, or a short entry ending in sentence punctuation) live in `lib/scan-rules.ts`, a pure module imported by both the AI routes (prompt limits + parse truncation) and the add-words sheet (which reports which limit a too-busy photo exceeded).
 
@@ -143,11 +145,11 @@ The word detail screen shows verb-specific sections (example sentence, Perfekt, 
 Every route handler calls `requireAdmin(req)`:
 bearer token from the client session → verified via service-role `auth.getUser(token)` → email checked against `ADMIN_EMAILS`. Returns 501 when unconfigured, 401/403 on failures. The service-role client bypasses RLS, which is exactly why it exists only in server code. The client (`lib/admin/client.ts` → `adminFetch`) attaches the session token to every call. When the server rejects that token (401), the admin layout signs out locally before redirecting to `/login`: a session can look valid client-side (unexpired JWT in storage) yet be rejected server-side, for example after a Supabase key rotation, and without the local sign-out the login page would see the stored session and bounce right back.
 
-The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with scrollable tabs, plus a light/dark theme toggle shared with the app's setting) with sections for Users, Feedback, Announcements, **Preset groups**, Email, and **System settings**. Preset groups are curated word lists stored in the `preset_groups` table: admin routes handle create/update/delete (words normalized server-side: trimmed, deduped, capped), while an RLS select policy lets any signed-in user read them from the app. Each preset carries an `is_default` flag (star toggle on the row, switch in the create form): default presets are seeded into every user's library automatically on the client (see "Preset groups" above). System settings manages the Groq API key plus the text and vision model ids in the `app_settings` table: a plain key/value table with RLS enabled and deliberately **no policies**, so only the service role can touch it. Storing the key in the database (instead of an env var) means it can be added, rotated, or removed from the UI without a redeploy.
+The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with scrollable tabs, plus a light/dark theme toggle shared with the app's setting) with sections for Users, Feedback, Announcements, **Preset groups**, Email, and **System settings**. Preset groups are curated word lists stored in the `preset_groups` table: admin routes handle create/update/delete (words normalized server-side: trimmed, deduped, capped), while an RLS select policy lets any signed-in user read them from the app. Each preset carries an `is_default` flag (star toggle on the row, switch in the create form): default presets are seeded into every user's library automatically on the client (see "Preset groups" above). System settings manages both AI providers in the `app_settings` table — the Gemini key + model (primary) and the Groq key plus text and vision model ids (fallback): a plain key/value table with RLS enabled and deliberately **no policies**, so only the service role can touch it. Storing the keys in the database means they can be added, rotated, or removed from the UI without a redeploy; the Gemini key can additionally come from the `GEMINI_API_KEY` env var, with the database value taking precedence.
 
 ### 7. AI routes (src/app/api/ai/*)
 
-Two non-admin server routes accept requests from **any signed-in user** (bearer token verified via the service-role client, no allowlist) and share their plumbing in `src/app/api/ai/_shared.ts` (auth, `app_settings` read, Groq call, word-list parsing). `/api/ai/extract-words-image` takes a downscaled JPEG data URL and asks the configured vision model (default `qwen/qwen3.6-27b` — Groq deprecated Llama 4 Scout for 2026-07-17 — key `groq_vision_model`) for a JSON list of vocabulary entries read straight off the photo. `/api/ai/extract-words` takes raw OCR text and asks the text model (default Llama 3.3, key `groq_model`) to clean it up. Both run at temperature 0 with capped input and output, 25/20-second timeouts, prompts forbidding invented words, and per-kind entry caps (40 words / 20 sentences, shared with the client via `lib/scan-rules.ts`); Qwen models get `reasoning_effort: "none"` so thinking tokens don't eat the output budget, and the word-list parser tolerates think tags and markdown fences. Every failure mode returns a non-200 status — a Groq 429 passes through as 429, everything else becomes 502; the client helpers (`lib/ai.ts`) convert them to `"rate-limited"` or `null`, which callers treat as "use the next fallback" (vision → on-device OCR + text cleanup → heuristics) while telling the user the scan was degraded. This means AI outages degrade the scan quality, never break the feature.
+Two non-admin server routes accept requests from **any signed-in user** (bearer token verified via the service-role client, no allowlist) and share their plumbing in `src/app/api/ai/_shared.ts` (auth, `app_settings` read, provider calls, word-list parsing). Each runs the same provider chain: **Gemini first** (default `gemini-2.5-flash`, keys `gemini_api_key`/`gemini_model`; the key falls back to the `GEMINI_API_KEY` env var), then **Groq** on any Gemini failure. `/api/ai/extract-words-image` takes a downscaled JPEG data URL and asks the vision model (Groq default `qwen/qwen3.6-27b` — Llama 4 Scout was deprecated for 2026-07-17 — key `groq_vision_model`) for a JSON list of vocabulary entries read straight off the photo. `/api/ai/extract-words` takes raw OCR text and asks the text model (Groq default Llama 3.3, key `groq_model`) to clean it up. Both run at temperature 0 with capped input and output, per-provider timeouts budgeted so the fallback still fits inside the client's request timeout (image: 15s Gemini + 12s Groq; text: 12s + 10s), prompts forbidding invented words, and per-kind entry caps (40 words / 20 sentences, shared with the client via `lib/scan-rules.ts`); Qwen models get `reasoning_effort: "none"` and Gemini 2.5 models `thinkingBudget: 0` so thinking tokens don't eat the output budget, and the word-list parser tolerates think tags and markdown fences. When both providers fail the route returns 429 if either was rate limited (retrying may help), otherwise 502; the client helpers (`lib/ai.ts`) convert them to `"rate-limited"` or `null`, which callers treat as "use the next fallback" (vision → on-device OCR + text cleanup → heuristics) while telling the user the scan was degraded. This means AI outages degrade the scan quality, never break the feature.
 
 ## Key technical decisions
 
@@ -161,8 +163,8 @@ Summarized here; rationale in `docs/DECISIONS.md`:
 - Module-store state via `useSyncExternalStore` instead of a state library
 - Hand-rolled UI primitives in the shadcn idiom instead of the Radix dependency tree
 - Admin authorization via env-var allowlist instead of a roles table
-- Photo scan is vision-first (Groq vision model on the downscaled photo), with on-device OCR (Tesseract.js, self-hosted assets) + AI text cleanup + heuristic detection as the automatic fallback chain
-- Groq key and model ids server-held in `app_settings` (admin-editable, no redeploy); the key never reaches the client
+- Photo scan is vision-first (Gemini on the downscaled photo, Groq vision model as fallback), with on-device OCR (Tesseract.js, self-hosted assets) + AI text cleanup + heuristic detection as the automatic fallback chain
+- Provider keys and model ids server-held in `app_settings` (admin-editable, no redeploy; the Gemini key alternatively via env var); the keys never reach the client
 
 ## Known gaps / undocumented areas
 
@@ -173,7 +175,7 @@ Flagged honestly for future work:
 - **No analytics/telemetry** — usage is unknown beyond Supabase table sizes
 - **Settings are per-device** (localStorage), deliberately not synced — undocumented in the UI
 - Wiktionary/MyMemory are called client-side without keys; their rate limits are unenforced and failures degrade to "notfound" silently (a "Retry lookups" button exists in Settings, and words still "pending" resume automatically at startup/after sync pulls)
-- The `/api/ai/*` routes (`extract-words`, `extract-words-image`) have no per-user rate limiting: any signed-in user can spend the Groq quota. The free tier is tight in practice (bursts of vision scans 429 within a minute); the client shows a "scanner is busy" notice, and a paid Groq tier is the fix if it happens often
+- The `/api/ai/*` routes (`extract-words`, `extract-words-image`) have no per-user rate limiting: any signed-in user can spend the AI quota. Groq's free tier is tight in practice (bursts of vision scans 429 within a minute), which is why Gemini is tried first and Groq only absorbs its failures; when both are rate limited the client shows a "scanner is busy" notice
 - `{{de-noun}}` plural parsing is best-effort; unusual template forms yield no plural
 - No in-app "forgot password" flow — resets are triggered from the back office or the Supabase dashboard
 - Supabase dashboard configuration (Site URL, redirect URLs, email confirmation off) lives outside the repo with no infrastructure-as-code

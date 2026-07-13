@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
-import {
-  authenticateUser,
-  callGroqChat,
-  loadGroqSettings,
-  parseWordList,
-  reasoningParams,
-} from "../_shared";
+import { authenticateUser, extractWordsViaProviders } from "../_shared";
 import { MAX_SCAN_SENTENCES, MAX_SCAN_WORDS } from "@/lib/scan-rules";
 
 /**
- * Extracts German vocabulary from raw OCR text using the Groq API (key
- * configured in the back office and stored in app_settings). Available to any
- * signed-in user. This is the text fallback behind /api/ai/extract-words-image
- * for scans, and the client falls back further to on-device heuristic word
- * detection when this route fails too.
+ * Extracts German vocabulary from raw OCR text: Gemini first, Groq as
+ * fallback (keys configured in the back office and stored in app_settings).
+ * Available to any signed-in user. This is the text fallback behind
+ * /api/ai/extract-words-image for scans, and the client falls back further to
+ * on-device heuristic word detection when this route fails too.
  */
 
 const MAX_INPUT_CHARS = 4000;
@@ -39,27 +33,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No text to analyze" }, { status: 400 });
   }
 
-  const settings = await loadGroqSettings(auth.svc);
-  if ("error" in settings) return settings.error;
-
-  try {
-    const result = await callGroqChat(
-      settings.apiKey,
-      {
-        model: settings.model,
-        max_tokens: 2048,
-        ...reasoningParams(settings.model),
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: text.slice(0, MAX_INPUT_CHARS) },
-        ],
-      },
-      20_000
-    );
-    if ("error" in result) return result.error;
-    return NextResponse.json({ words: parseWordList(result.content) });
-  } catch {
-    // network failure, timeout or unparseable model output
-    return NextResponse.json({ error: "AI analysis failed" }, { status: 502 });
-  }
+  return extractWordsViaProviders(auth.svc, {
+    kind: "text",
+    prompt: SYSTEM_PROMPT,
+    text: text.slice(0, MAX_INPUT_CHARS),
+  });
 }

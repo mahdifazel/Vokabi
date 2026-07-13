@@ -24,7 +24,7 @@ Until automated coverage exists, changes are verified against the affected flows
 - [ ] Add an obscure word offline → status "no translation found"; Settings → *Retry lookups* fixes it once online
 - [ ] Edit a word manually; delete a word
 - [ ] Open a verb (e.g. "gehen", "aufstehen", "sich freuen") → example with playback, Perfekt with sein/haben chip, collapsible conjugation and grammar sections; nouns/adjectives show none of these
-- [ ] Photo scan: "Scan a photo" opens the in-app camera (or file picker without camera permission); a clear printed word list yields clean entries in the textarea; with the Groq key configured the "Identifying words" phase runs; with the key removed the scan still works (heuristic fallback); scans keep sentences whole and are capped at 40 words / 20 sentences with a matching error message
+- [ ] Photo scan: "Scan a photo" opens the in-app camera (or file picker without camera permission); a clear printed word list yields clean entries in the textarea; with a Gemini or Groq key configured the "Identifying words" phase runs (Gemini first, Groq as fallback); with all keys removed the scan still works (heuristic fallback); scans keep sentences whole and are capped at 40 words / 20 sentences with a matching error message
 - [ ] Delete a group that contains words → its words appear in General, not lost
 - [ ] Add-words sheet from the Library page has the first group preselected; from a group page that group is targeted
 
@@ -58,7 +58,7 @@ Until automated coverage exists, changes are verified against the affected flows
 - [ ] Users list/detail, ban/unban, password reset, delete user
 - [ ] Feedback: submit from Settings → appears in inbox → resolve
 - [ ] Announcement: publish → banner appears in app → dismiss persists → toggle off removes it
-- [ ] System settings: save a Groq key (masked hint shown), Test connection reports key validity and model availability, Remove key works
+- [ ] System settings: save a Gemini or Groq key (masked hint shown), Test connection reports key validity and model availability, Remove key works; the Gemini card notes when the env-var key is active
 
 ## Recommended future setup (not yet implemented)
 

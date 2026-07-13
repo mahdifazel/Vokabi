@@ -109,9 +109,9 @@ export function AddWordsSheet({
     try {
       const canvas = await downscaleToCanvas(source);
 
-      // vision first: the photo goes straight to a Groq vision model
-      // (configured in the back office); null means unavailable or failed,
-      // an empty array means the AI saw no vocabulary in the photo
+      // vision first: the photo goes straight to a vision model (Gemini,
+      // then Groq as fallback, configured in the back office); null means
+      // unavailable or failed, an empty array means no vocabulary was seen
       setScanState({ phase: "analyzing" });
       const visionResult = await extractWordsFromImageWithAi(canvas);
       let rateLimited = visionResult === "rate-limited";

@@ -64,3 +64,11 @@ export interface AdminGroqSettings {
   model: string;
   visionModel: string;
 }
+
+export interface AdminGeminiSettings {
+  configured: boolean;
+  keyHint: string | null;
+  /** true when a key is set via env var in the hosting platform */
+  envConfigured: boolean;
+  model: string;
+}

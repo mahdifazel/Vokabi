@@ -1,23 +1,18 @@
 import { NextResponse } from "next/server";
-import {
-  authenticateUser,
-  callGroqChat,
-  loadGroqSettings,
-  parseWordList,
-  reasoningParams,
-} from "../_shared";
+import { authenticateUser, extractWordsViaProviders } from "../_shared";
 import { MAX_SCAN_SENTENCES, MAX_SCAN_WORDS } from "@/lib/scan-rules";
 
 /**
- * Extracts German vocabulary straight from a scanned photo using a Groq
- * vision model (model id in app_settings, managed in the back office).
- * Available to any signed-in user. The client tries this first and falls back
- * to on-device OCR + /api/ai/extract-words on any non-200, so failures here
- * only need the right status code.
+ * Extracts German vocabulary straight from a scanned photo using a vision
+ * model: Gemini first, Groq as fallback (keys/models in app_settings, managed
+ * in the back office; the Gemini key can also come from the env). Available
+ * to any signed-in user. The client tries this first and falls back to
+ * on-device OCR + /api/ai/extract-words on any non-200, so failures here only
+ * need the right status code.
  */
 
 // the downscaled 1600px q0.8 JPEG stays far below this; the cap just keeps
-// oversized payloads from reaching Groq (4 MB base64 image limit)
+// oversized payloads from reaching the providers (4 MB base64 image limit)
 const MAX_IMAGE_CHARS = 5_000_000;
 
 const VISION_PROMPT = `This photo shows German vocabulary: a vocabulary list, textbook page, worksheet or handwritten notes. Extract the German vocabulary entries a learner would save, and respond ONLY with JSON in the form {"words": ["...", "..."]}.
@@ -44,32 +39,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No usable image" }, { status: 400 });
   }
 
-  const settings = await loadGroqSettings(auth.svc);
-  if ("error" in settings) return settings.error;
-
-  try {
-    const result = await callGroqChat(
-      settings.apiKey,
-      {
-        model: settings.visionModel,
-        max_tokens: 2048,
-        ...reasoningParams(settings.visionModel),
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: VISION_PROMPT },
-              { type: "image_url", image_url: { url: image } },
-            ],
-          },
-        ],
-      },
-      25_000
-    );
-    if ("error" in result) return result.error;
-    return NextResponse.json({ words: parseWordList(result.content) });
-  } catch {
-    // network failure, timeout or unparseable model output
-    return NextResponse.json({ error: "AI analysis failed" }, { status: 502 });
-  }
+  return extractWordsViaProviders(auth.svc, { kind: "image", prompt: VISION_PROMPT, image });
 }

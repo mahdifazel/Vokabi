@@ -10,7 +10,7 @@
 | Database + auth | Supabase (single project) | Also linked via the Vercel↔Supabase integration, which injects the `NEXT_PUBLIC_SUPABASE_*` variables |
 | Email (auth mails) | Supabase built-in mailer | ⚠️ Heavily rate-limited (~a few/hour); "Confirm email" is disabled for this reason. Configure custom SMTP before relying on password-reset emails at scale |
 | Email (broadcasts) | Resend (optional) | Only used by the admin Email tab |
-| AI (photo-scan cleanup) | Groq (optional) | Key is stored in the `app_settings` table and managed at `/admin/settings`, not an env var; scans fall back to heuristics without it |
+| AI (photo scan) | Gemini (primary) + Groq (fallback), both optional | Keys are stored in the `app_settings` table and managed at `/admin/settings`; the Gemini key can also come from the `GEMINI_API_KEY` env var (the `app_settings` value wins). Scans fall back to on-device OCR + heuristics without any key |
 
 **Deploy = `git push`.** Every push to `main` triggers a Vercel production build and release. There is no CI gate — run `npm run lint && npm run build` locally before pushing (see `CONTRIBUTING.md`).
 
@@ -42,12 +42,13 @@
      | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | for accounts/sync | anon / publishable key |
      | `SUPABASE_SERVICE_ROLE_KEY` | for `/admin` | service_role secret key |
      | `ADMIN_EMAILS` | for `/admin` | comma-separated admin login emails |
+     | `GEMINI_API_KEY` | optional | Gemini key for the AI photo scan (can also be saved at `/admin/settings` instead) |
      | `RESEND_API_KEY` | optional | Resend API key (admin email tab) |
      | `EMAIL_FROM` | optional | e.g. `Vokabi <hello@yourdomain.com>` (domain verified in Resend) |
 
    - Alternatively, install the **Vercel↔Supabase integration** ("Link existing Supabase account") which injects the two `NEXT_PUBLIC_*` variables automatically (keep the default `NEXT_PUBLIC_` prefix)
    - Deploy; attach the custom domain under Settings → Domains
-4. **Groq (optional, AI photo-scan cleanup)** — sign in as an admin, open **Back office → System settings**, paste a Groq API key ([console.groq.com](https://console.groq.com)) and use *Test connection*. The key lives in the `app_settings` table, so no env var or redeploy is involved; without it photo scans use the heuristic fallback
+4. **AI providers (optional, photo scan)** — sign in as an admin, open **Back office → System settings**, paste a Gemini API key ([aistudio.google.com](https://aistudio.google.com), tried first) and/or a Groq API key ([console.groq.com](https://console.groq.com), the fallback) and use *Test connection*. The keys live in the `app_settings` table, so no redeploy is involved (the Gemini key may alternatively be the `GEMINI_API_KEY` env var); without any key photo scans use on-device OCR with the heuristic fallback
 5. **Verify** — open the site: you should land on `/login`; create the admin account (email from `ADMIN_EMAILS`); Settings should show sync status and the **Back office** button; add a word and confirm it appears in Supabase → Table Editor → `words`
 
 ## Operational gotchas
