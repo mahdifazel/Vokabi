@@ -188,6 +188,9 @@ export async function callGemini(
     }
   );
   if (!res.ok) {
+    // surfaced in the Vercel function logs; the client only sees the status
+    const detail = await res.text().catch(() => "");
+    console.error(`Gemini ${res.status}: ${detail.slice(0, 500)}`);
     const status = res.status === 429 ? 429 : 502;
     return {
       error: NextResponse.json({ error: `Gemini error (${res.status})` }, { status }),
@@ -246,8 +249,9 @@ export async function extractWordsViaProviders(
         // provider is diagnostic only; the client ignores it
         return NextResponse.json({ words: parseWordList(result.content), provider: "gemini" });
       }
-    } catch {
+    } catch (e) {
       // network failure, timeout or unparseable model output: try Groq
+      console.error(`Gemini call failed: ${e instanceof Error ? e.message : e}`);
     }
   }
 
