@@ -149,12 +149,18 @@ export async function callGroqChat(
 type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
 /**
- * Gemini 2.5 models think by default and the reasoning tokens count against
- * maxOutputTokens, so thinking is turned off (same idea as reasoningParams
- * for Qwen on Groq). Other Gemini generations reject the field.
+ * Gemini models think by default and the reasoning tokens eat both latency
+ * and the output budget, so thinking is dialed down for this fact-retrieval
+ * task (same idea as reasoningParams for Qwen on Groq). Gemini 2.5 takes a
+ * token budget (0 = off); 3.x and newer (including the -latest aliases) take
+ * a level, "minimal" being the lowest; 2.0 and older reject the field.
  */
-function geminiThinkingConfig(model: string): { thinkingConfig?: { thinkingBudget: 0 } } {
-  return model.startsWith("gemini-2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {};
+function geminiThinkingConfig(
+  model: string
+): { thinkingConfig?: { thinkingBudget: 0 } | { thinkingLevel: "minimal" } } {
+  if (model.startsWith("gemini-2.5")) return { thinkingConfig: { thinkingBudget: 0 } };
+  if (/^gemini-[12]/.test(model)) return {};
+  return { thinkingConfig: { thinkingLevel: "minimal" } };
 }
 
 /**
@@ -180,7 +186,9 @@ export async function callGemini(
         contents: [{ role: "user", parts }],
         generationConfig: {
           temperature: 0,
-          maxOutputTokens: 4096,
+          // headroom for any thinking tokens the model spends despite the
+          // minimal level; they count against this cap
+          maxOutputTokens: 8192,
           responseMimeType: "application/json",
           ...geminiThinkingConfig(model),
         },
@@ -238,6 +246,7 @@ export async function extractWordsViaProviders(
   let rateLimited = false;
 
   if (settings.gemini) {
+    let content = "";
     try {
       const result = await callGemini(
         settings.gemini.apiKey,
@@ -248,12 +257,16 @@ export async function extractWordsViaProviders(
       if ("error" in result) {
         if (result.error.status === 429) rateLimited = true;
       } else {
+        content = result.content;
         // provider is diagnostic only; the client ignores it
-        return NextResponse.json({ words: parseWordList(result.content), provider: "gemini" });
+        return NextResponse.json({ words: parseWordList(content), provider: "gemini" });
       }
     } catch (e) {
       // network failure, timeout or unparseable model output: try Groq
-      console.error(`Gemini call failed: ${e instanceof Error ? e.message : e}`);
+      console.error(
+        `Gemini call failed: ${e instanceof Error ? e.message : e}` +
+          (content ? ` — content: ${content.slice(0, 300)}` : "")
+      );
     }
   }
 
