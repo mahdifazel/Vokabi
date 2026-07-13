@@ -15,9 +15,11 @@ export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 // recommended vision replacement
 export const DEFAULT_GROQ_VISION_MODEL = "qwen/qwen3.6-27b";
 // multimodal, so one model id covers both the photo scan and OCR cleanup.
-// The alias tracks Google's newest flash release: concrete ids get retired
-// for new API users (gemini-2.5-flash already 404s on keys created in 2026)
-export const DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
+// The alias tracks Google's newest flash-lite release: concrete ids get
+// retired for new API users (gemini-2.5-flash already 404s on keys created
+// in 2026), and the plain flash tier (gemini-3.5-flash) is a heavyweight
+// frontier model now — measured 30s+ per answer, far too slow for a scan
+export const DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
 
 /** The Gemini key can come from the env (set in Vercel) as well as app_settings. */
 export function geminiEnvKey(): string | undefined {
