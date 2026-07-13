@@ -62,6 +62,10 @@ paste text → splitWordList() → rows inserted with status:"pending" (UI shows
 
 Duplicate words are merged into existing rows (group membership union) rather than re-inserted.
 
+Enrichment is fire-and-forget browser work, so closing or backgrounding the app aborts it and leaves rows on `status: "pending"` ("looking up…" in the UI); rows synced from another device can arrive pending too. `resumePendingEnrichment()` (`lib/words.ts`) picks them back up after each sync pull (cloud mode) or at startup (local-only mode), skips while offline, and an in-flight set prevents enriching the same word twice concurrently.
+
+**Import/export** round-trips groups. CSV has a `groups` column (names separated by `|`); JSON exports `{ version, groups, words }` with group names per word plus the full group list, so empty groups survive, while sync internals (`uid`, `dirty`, local ids) stay on the device. Importing (TXT/CSV/JSON, `lib/words.ts`) creates missing groups by case-insensitive name match, files words into their groups, and merges duplicates; rows without group info fall back to the single-existing-group default, with orphans re-homed via `ensureWordsGrouped()`.
+
 `splitWordList()` separates entries on newlines, semicolons, `/`, or a dash surrounded by spaces. Commas never split, so plural notes ("die Katze, -n") and example sentences stay one entry, and a bare dash never splits either ("E-Mail", the plural shorthand "-n").
 
 **Preset groups** feed the same flow: the "New group" sheet (`components/new-group-sheet.tsx`) fetches admin-curated `preset_groups` rows via `lib/presets.ts` (direct Supabase read; RLS grants select to authenticated users), and picking one creates a plain local group and pushes its word list through `addWordsFromText()` — so preset words enrich, sync, and behave exactly like pasted words, with no lasting link to the preset ("already added" is detected by name). Presets flagged `is_default` in the back office skip the sheet entirely: after each successful sync pull, `seedDefaultPresetGroups()` (`lib/words.ts`) materializes any the account hasn't processed yet through the same copy pipeline. The localStorage record (`vokabi.seededPresets.<userId>`) maps each processed preset id to the uid of the group the seeding created, which makes the operation reversible: a user who deletes a default group doesn't get it re-seeded on that device, and when the admin unflags or deletes the preset the next seeding pass removes the created group again (via `deleteGroupAndWords()`, so words shared with other groups survive), with the deletion syncing to the account's other devices.
@@ -167,7 +171,7 @@ Flagged honestly for future work:
 - **No error monitoring** (Sentry etc.) — client errors are invisible in production
 - **No analytics/telemetry** — usage is unknown beyond Supabase table sizes
 - **Settings are per-device** (localStorage), deliberately not synced — undocumented in the UI
-- Wiktionary/MyMemory are called client-side without keys; their rate limits are unenforced and failures degrade to "notfound" silently (a "Retry lookups" button exists in Settings)
+- Wiktionary/MyMemory are called client-side without keys; their rate limits are unenforced and failures degrade to "notfound" silently (a "Retry lookups" button exists in Settings, and words still "pending" resume automatically at startup/after sync pulls)
 - The `/api/ai/*` routes (`extract-words`, `extract-words-image`) have no per-user rate limiting: any signed-in user can spend the Groq quota (free tier is generous; revisit if usage grows)
 - `{{de-noun}}` plural parsing is best-effort; unusual template forms yield no plural
 - No in-app "forgot password" flow — resets are triggered from the back office or the Supabase dashboard

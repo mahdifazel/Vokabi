@@ -59,7 +59,7 @@ Database schema is applied **manually** in the Supabase SQL Editor: run `supabas
 
 ## Architecture in one paragraph
 
-The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing → MyMemory translation fallback. Photo scanning is vision-first: the photo is downscaled once (`src/lib/image.ts`) and sent as a JPEG to `/api/ai/extract-words-image` (Groq vision model); on any failure the fallback chain runs — Tesseract.js on-device OCR (`src/lib/ocr.ts`, assets self-hosted under `/ocr/`), then `/api/ai/extract-words` for Groq text cleanup, then the heuristic line filter (`src/lib/ai.ts` returns null on failure at each AI step). Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist) and `/api/ai/*` (signed-in users; calls Groq with the key stored in `app_settings`, and the client falls back to on-device heuristics when it fails). Preset groups are the one admin-curated table users read directly: `lib/presets.ts` queries `preset_groups` via the Supabase client (RLS allows select to authenticated users), and adding one materializes a normal local group + words through the standard pipeline. See `docs/ARCHITECTURE.md` for the full picture.
+The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing → MyMemory translation fallback; enrichment left unfinished ("pending" words) resumes automatically at startup and after sync pulls. Photo scanning is vision-first: the photo is downscaled once (`src/lib/image.ts`) and sent as a JPEG to `/api/ai/extract-words-image` (Groq vision model); on any failure the fallback chain runs — Tesseract.js on-device OCR (`src/lib/ocr.ts`, assets self-hosted under `/ocr/`), then `/api/ai/extract-words` for Groq text cleanup, then the heuristic line filter (`src/lib/ai.ts` returns null on failure at each AI step). Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist) and `/api/ai/*` (signed-in users; calls Groq with the key stored in `app_settings`, and the client falls back to on-device heuristics when it fails). Preset groups are the one admin-curated table users read directly: `lib/presets.ts` queries `preset_groups` via the Supabase client (RLS allows select to authenticated users), and adding one materializes a normal local group + words through the standard pipeline. See `docs/ARCHITECTURE.md` for the full picture.
 
 ## Directory structure
 
@@ -72,7 +72,7 @@ src/
     groups/page.tsx        Redirect → / (legacy route)
     favorites/             Favorites list
     learn/                 Learn hub, flashcards/, quiz/
-    word/[id]/             Word detail (edit, practice, groups, delete; verb sections for verbs)
+    word/[id]/             Word detail (edit incl. group membership, practice, delete; verb sections for verbs)
     login/                 Standalone auth screen (no shell chrome)
     settings/              Audio/theme/data/account/feedback
     admin/                 Back office UI (own layout + guard)
@@ -90,7 +90,7 @@ src/
   lib/
     types.ts               All shared types + article color maps
     db.ts                  Dexie schema v2, mutation hooks (uid/dirty), remote-write guard
-    words.ts               Word CRUD, bulk add + enrichment, import/export, search
+    words.ts               Word CRUD, bulk add + enrichment (auto-resumed when interrupted), group-aware import/export, default preset seeding, search
     dictionary.ts          Lookup pipeline + Wiktionary wikitext parser
     seed-dictionary.ts     ~300 common A1/A2 words bundled for offline
     sync.ts                Push/pull/merge engine + default-group seeding

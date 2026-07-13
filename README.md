@@ -16,11 +16,11 @@ A mobile-first Progressive Web App for learning German vocabulary. Paste words, 
 - **Pronunciation practice** — speak the word, get *Excellent / Good / Needs improvement* with mistake letters highlighted (speech recognition)
 - **Flashcards** — 3D flip cards, swipe right = got it / left = still learning, retry-missed rounds
 - **Quiz** — multiple choice: German→English, English→German, and der/die/das article questions with audio feedback
-- **Organization** — groups (with a default **General** group), favorites, instant global search, word details with examples and notes; "New group" offers a custom name or a searchable list of **ready-made groups** curated in the back office (added with their words in one tap); deleting a group lets you keep its words or delete them too (words shared with other groups are never deleted)
-- **Import / export** — TXT/CSV import, CSV/JSON export
+- **Organization** — groups (with a default **General** group), favorites, instant global search, word details with examples and notes (group membership is edited in the word's edit sheet); "New group" offers a custom name or a searchable list of **ready-made groups** curated in the back office (added with their words in one tap), and presets flagged **default** appear in every user's library automatically; deleting a group lets you keep its words or delete them too (words shared with other groups are never deleted)
+- **Import / export** — TXT/CSV/JSON import, CSV/JSON export; both formats carry group membership, so importing on another account recreates missing groups and files every word into the right ones
 - **Accounts & sync** — email/password or Google login (Supabase); words sync across devices, protected by Postgres row-level security; offline-first so everything works without a connection
 - **PWA** — installable on Android, offline service worker, dark (default)/light/system theme, cinematic once-per-session splash
-- **Admin back office** (`/admin`) — sidebar layout with light/dark toggle, user management (ban/delete/reset password), feedback inbox, announcement banners, preset groups (curated word lists users can add from the app), email broadcast, and System settings (Groq AI key plus vision/text model ids, stored server-side and editable without a redeploy)
+- **Admin back office** (`/admin`) — sidebar layout with light/dark toggle, user management (ban/delete/reset password), feedback inbox, announcement banners, preset groups (curated word lists users can add from the app; those flagged default are seeded into every library and removed again when unflagged), email broadcast, and System settings (Groq AI key plus vision/text model ids, stored server-side and editable without a redeploy)
 
 ## Prerequisites
 
