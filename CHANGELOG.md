@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Default preset groups.** Presets can be flagged as default in the back office (star toggle on the row, switch in the create form); after a sync pull the app seeds unseen default presets into the user's library as normal groups, and unflagging or deleting the preset removes the seeded group again on the next pass (words shared with other groups are kept). Processed preset ids and the created group uids are tracked per account in localStorage, so removal never touches a user's own groups and a user-deleted default group stays deleted on that device. Requires the new `is_default` column (rerun `supabase/admin-schema.sql`)
 
+### Fixed
+
+- **Words no longer get stuck on "looking up…".** Enrichment is background browser work, so closing, reloading, or backgrounding the app aborted it mid-queue (easy to hit with large seeded default groups), and words synced from another device could arrive still pending with nothing retrying them. Pending words are now resumed automatically at startup and after each sync pull, with an in-flight guard so a word is never enriched twice at once
+
 ### Changed
 
 - **Group membership moved into the word edit sheet.** The word detail page no longer shows the full group chip list; the Groups selector now lives in the edit sheet (below Article) and is saved together with the other fields via Save changes. A word saved with no groups is re-homed to General so it stays visible in the library

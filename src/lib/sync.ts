@@ -5,7 +5,7 @@ import { db, onLocalMutation, withRemoteWrites } from "./db";
 import { getSupabase } from "./supabase";
 import { getUser } from "./auth";
 // circular with words.ts (it imports scheduleSync); safe, both only call at runtime
-import { ensureWordsGrouped, seedDefaultPresetGroups } from "./words";
+import { ensureWordsGrouped, resumePendingEnrichment, seedDefaultPresetGroups } from "./words";
 import type { Article, PartOfSpeech, Word, WordStatus } from "./types";
 
 export interface SyncState {
@@ -228,6 +228,11 @@ export async function syncNow(): Promise<void> {
     // hasn't seen yet (after the pull, so synced copies win by name).
     // Best effort, a failure here must not mark the sync as failed
     await seedDefaultPresetGroups().catch(() => {});
+
+    // pick words stuck on "looking up" back up (interrupted enrichment on
+    // this device, or rows that arrived pending from another device).
+    // Fire-and-forget: enriching a big group can take minutes
+    void resumePendingEnrichment();
 
     const now = Date.now();
     localStorage.setItem(LAST_SYNC_KEY, String(now));

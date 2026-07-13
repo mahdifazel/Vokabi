@@ -74,7 +74,13 @@ async function enrichWords(items: { input: ParsedInput; word: Word }[]) {
   );
 }
 
+// guards against the same word being enriched twice concurrently (e.g. a
+// fresh add still running when the pending-resume pass picks the word up)
+const inFlightEnrichment = new Set<number>();
+
 async function enrichOne(input: ParsedInput, id: number) {
+  if (inFlightEnrichment.has(id)) return;
+  inFlightEnrichment.add(id);
   try {
     const entry = await lookupWord(input);
     const built = buildWord(input, entry);
@@ -90,7 +96,24 @@ async function enrichOne(input: ParsedInput, id: number) {
     });
   } catch {
     await db.words.update(id, { status: "notfound", updatedAt: Date.now() });
+  } finally {
+    inFlightEnrichment.delete(id);
   }
+}
+
+/**
+ * Enrichment is fire-and-forget browser work: closing, reloading, or
+ * backgrounding the app aborts it and leaves words stuck on "looking up"
+ * ("pending"), and words synced from another device can arrive pending too.
+ * Resume them; runs at startup and after sync pulls.
+ */
+export async function resumePendingEnrichment() {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return;
+  const stale = await db.words.filter((w) => w.status === "pending").toArray();
+  const items = stale
+    .filter((w) => w.id != null && !inFlightEnrichment.has(w.id))
+    .map((w) => ({ input: { german: w.german, articleHint: w.article }, word: w }));
+  if (items.length > 0) await enrichWords(items);
 }
 
 /**
