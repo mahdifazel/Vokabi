@@ -14,8 +14,10 @@ export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 // llama-4-scout was deprecated by Groq (shutdown 2026-07-17); qwen3.6 is their
 // recommended vision replacement
 export const DEFAULT_GROQ_VISION_MODEL = "qwen/qwen3.6-27b";
-// multimodal, so one model id covers both the photo scan and OCR cleanup
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+// multimodal, so one model id covers both the photo scan and OCR cleanup.
+// The alias tracks Google's newest flash release: concrete ids get retired
+// for new API users (gemini-2.5-flash already 404s on keys created in 2026)
+export const DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
 
 /** The Gemini key can come from the env (set in Vercel) as well as app_settings. */
 export function geminiEnvKey(): string | undefined {
