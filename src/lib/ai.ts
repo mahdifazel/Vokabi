@@ -18,12 +18,15 @@ async function getSessionToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+/** "rate-limited" = Groq is busy; retrying in a minute will likely work. */
+export type AiWordsResult = string[] | "rate-limited" | null;
+
 async function postForWords(
   path: string,
   token: string,
   body: unknown,
   timeoutMs: number
-): Promise<string[] | null> {
+): Promise<AiWordsResult> {
   const res = await fetch(path, {
     method: "POST",
     headers: {
@@ -33,6 +36,7 @@ async function postForWords(
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
+  if (res.status === 429) return "rate-limited";
   if (!res.ok) return null;
 
   const json = (await res.json()) as { words?: unknown };
@@ -42,7 +46,7 @@ async function postForWords(
 }
 
 /** Pull the vocabulary out of raw OCR text. */
-export async function extractWordsWithAi(rawText: string): Promise<string[] | null> {
+export async function extractWordsWithAi(rawText: string): Promise<AiWordsResult> {
   try {
     const token = await getSessionToken();
     if (!token) return null;
@@ -55,7 +59,7 @@ export async function extractWordsWithAi(rawText: string): Promise<string[] | nu
 /** Pull the vocabulary straight out of a scanned photo via a vision model. */
 export async function extractWordsFromImageWithAi(
   canvas: HTMLCanvasElement
-): Promise<string[] | null> {
+): Promise<AiWordsResult> {
   try {
     // session check before encoding: local-only/signed-out scans skip the
     // JPEG work entirely and go straight to on-device OCR

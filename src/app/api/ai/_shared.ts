@@ -108,8 +108,10 @@ export async function callGroqChat(
     cache: "no-store",
   });
   if (!res.ok) {
+    // pass rate limits through so the client can tell the user to retry
+    const status = res.status === 429 ? 429 : 502;
     return {
-      error: NextResponse.json({ error: `Groq error (${res.status})` }, { status: 502 }),
+      error: NextResponse.json({ error: `Groq error (${res.status})` }, { status }),
     };
   }
   const json = (await res.json()) as {

@@ -112,7 +112,9 @@ export function AddWordsSheet({
       // (configured in the back office); null means unavailable or failed,
       // an empty array means the AI saw no vocabulary in the photo
       setScanState({ phase: "analyzing" });
-      let words = await extractWordsFromImageWithAi(canvas);
+      const visionResult = await extractWordsFromImageWithAi(canvas);
+      let rateLimited = visionResult === "rate-limited";
+      let words = Array.isArray(visionResult) ? visionResult : null;
       let aiUsed = words !== null;
 
       if (words === null) {
@@ -120,8 +122,12 @@ export function AddWordsSheet({
         const { rawText, lines } = await recognizeGerman(canvas, setScanState);
         if (rawText) {
           setScanState({ phase: "analyzing" });
-          words = await extractWordsWithAi(rawText);
-          aiUsed = words !== null;
+          const textResult = await extractWordsWithAi(rawText);
+          if (textResult === "rate-limited") rateLimited = true;
+          else if (textResult !== null) {
+            words = textResult;
+            aiUsed = true;
+          }
         }
         if (words === null) words = lines;
       }
@@ -142,7 +148,9 @@ export function AddWordsSheet({
         setText((t) => (t ? t + "\n" + words.join("\n") : words.join("\n")));
         if (!aiUsed) {
           setScanNotice(
-            "The AI scan wasn't available, so basic text recognition was used. Results may be less accurate."
+            rateLimited
+              ? "The AI scanner is busy right now, so basic text recognition was used. Scan again in a minute for better results."
+              : "The AI scan wasn't available, so basic text recognition was used. Results may be less accurate."
           );
         }
       }
