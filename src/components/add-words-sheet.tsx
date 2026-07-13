@@ -38,6 +38,7 @@ export function AddWordsSheet({
   const [scanNotice, setScanNotice] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const groupRowRef = useRef<HTMLDivElement>(null);
 
   // restore a draft after a reload; deferred so it is not a sync set in the effect
   useEffect(() => {
@@ -164,8 +165,19 @@ export function AddWordsSheet({
   }
 
   function toggleGroup(id: number) {
-    setSelectedGroups((g) => (g.includes(id) ? g.filter((x) => x !== id) : [...g, id]));
+    setSelectedGroups((g) => {
+      if (g.includes(id)) return g.filter((x) => x !== id);
+      // the chip moves to the front of the row; follow it there
+      groupRowRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+      return [...g, id];
+    });
   }
+
+  // selected groups first so they stay visible in the horizontal row
+  const orderedGroups = [
+    ...groups.filter((g) => selectedGroups.includes(g.id!)),
+    ...groups.filter((g) => !selectedGroups.includes(g.id!)),
+  ];
 
   return (
     <Sheet open={open} onClose={onClose} title="Add words">
@@ -275,14 +287,17 @@ export function AddWordsSheet({
       {groups.length > 1 && (
         <div className="mt-4">
           <p className="mb-2 text-sm font-extrabold">Add to groups</p>
-          <div className="flex flex-wrap gap-2">
-            {groups.map((g) => (
+          <div
+            ref={groupRowRef}
+            className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5"
+          >
+            {orderedGroups.map((g) => (
               <button
                 key={g.id}
                 onClick={() => toggleGroup(g.id!)}
                 aria-pressed={selectedGroups.includes(g.id!)}
                 className={cn(
-                  "cursor-pointer rounded-full px-4 py-2 text-sm font-bold transition-all active:scale-95",
+                  "shrink-0 cursor-pointer rounded-full px-4 py-2 text-sm font-bold whitespace-nowrap transition-all active:scale-95",
                   selectedGroups.includes(g.id!)
                     ? "bg-primary text-on-primary"
                     : "bg-surface-2 text-muted"
