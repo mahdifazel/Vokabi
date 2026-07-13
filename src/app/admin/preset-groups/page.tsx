@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FolderPlus, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { FolderPlus, Loader2, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { adminFetch, type AdminPresetGroupRow } from "@/lib/admin/client";
-import { Button, Card, EmptyState, Input, Textarea } from "@/components/ui";
+import { Button, Card, EmptyState, Input, Switch, Textarea } from "@/components/ui";
 
 function parseWords(text: string): string[] {
   return text
@@ -19,6 +19,7 @@ export default function AdminPresetGroupsPage() {
   // create form
   const [name, setName] = useState("");
   const [wordsText, setWordsText] = useState("");
+  const [isDefault, setIsDefault] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // inline editor
@@ -43,11 +44,15 @@ export default function AdminPresetGroupsPage() {
     try {
       const { preset } = await adminFetch<{ preset: AdminPresetGroupRow }>(
         "/api/admin/preset-groups",
-        { method: "POST", body: JSON.stringify({ name, words: parseWords(wordsText) }) }
+        {
+          method: "POST",
+          body: JSON.stringify({ name, words: parseWords(wordsText), isDefault }),
+        }
       );
       setRows((r) => [...(r ?? []), preset].sort((a, b) => a.name.localeCompare(b.name)));
       setName("");
       setWordsText("");
+      setIsDefault(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create");
     } finally {
@@ -88,6 +93,24 @@ export default function AdminPresetGroupsPage() {
     }
   }
 
+  async function toggleDefault(row: AdminPresetGroupRow) {
+    const next = !row.is_default;
+    setError("");
+    // optimistic; revert if the request fails
+    setRows((r) => r?.map((p) => (p.id === row.id ? { ...p, is_default: next } : p)) ?? null);
+    try {
+      await adminFetch(`/api/admin/preset-groups/${row.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isDefault: next }),
+      });
+    } catch (e) {
+      setRows(
+        (r) => r?.map((p) => (p.id === row.id ? { ...p, is_default: row.is_default } : p)) ?? null
+      );
+      setError(e instanceof Error ? e.message : "Failed to save");
+    }
+  }
+
   async function remove(id: string) {
     setRows((r) => r?.filter((p) => p.id !== id) ?? null);
     setConfirmDeleteId(null);
@@ -116,6 +139,15 @@ export default function AdminPresetGroupsPage() {
           autoCorrect="off"
           spellCheck={false}
         />
+        <div className="mt-3 flex items-center gap-3">
+          <Switch checked={isDefault} onCheckedChange={setIsDefault} label="Default group" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold">Default group</p>
+            <p className="text-xs font-semibold text-muted">
+              Added to every user&apos;s library automatically
+            </p>
+          </div>
+        </div>
         <div className="mt-3 flex items-center gap-3">
           <Button size="sm" disabled={!name.trim() || busy} onClick={create}>
             {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Create
@@ -170,12 +202,34 @@ export default function AdminPresetGroupsPage() {
             ) : (
               <Card key={p.id} className="flex items-center gap-4 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="font-extrabold">{p.name}</p>
+                  <p className="flex items-center gap-2 font-extrabold">
+                    <span className="truncate">{p.name}</span>
+                    {p.is_default && (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-extrabold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                        Default
+                      </span>
+                    )}
+                  </p>
                   <p className="mt-0.5 truncate text-xs font-bold text-muted">
                     {p.words.length} word{p.words.length === 1 ? "" : "s"}
                     {p.words.length > 0 && <> · {p.words.slice(0, 5).join(", ")}</>}
                   </p>
                 </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={
+                    p.is_default ? `Unmark ${p.name} as default` : `Mark ${p.name} as default`
+                  }
+                  title={p.is_default ? "Unmark as default" : "Mark as default"}
+                  onClick={() => toggleDefault(p)}
+                >
+                  <Star
+                    size={16}
+                    className={p.is_default ? "text-amber-500" : "text-muted"}
+                    fill={p.is_default ? "currentColor" : "none"}
+                  />
+                </Button>
                 <Button size="sm" variant="secondary" onClick={() => startEdit(p)}>
                   <Pencil size={15} /> Edit
                 </Button>

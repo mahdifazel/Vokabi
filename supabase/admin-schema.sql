@@ -47,9 +47,14 @@ create table if not exists public.preset_groups (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   words jsonb not null default '[]'::jsonb, -- array of German words
+  is_default boolean not null default false, -- seeded into every user's library
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- existing deployments: add the default-group flag
+alter table public.preset_groups
+  add column if not exists is_default boolean not null default false;
 
 alter table public.preset_groups enable row level security;
 

@@ -54,6 +54,7 @@ export interface AdminPresetGroupRow {
   id: string;
   name: string;
   words: string[];
+  is_default: boolean;
   created_at: string;
 }
 

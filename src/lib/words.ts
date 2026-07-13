@@ -1,5 +1,7 @@
 import { db } from "./db";
+import { getUser } from "./auth";
 import { buildWord, lookupWord, splitWordList, type ParsedInput } from "./dictionary";
+import { fetchPresetGroups } from "./presets";
 import { scheduleSync } from "./sync";
 import type { Word } from "./types";
 
@@ -126,6 +128,53 @@ export async function ensureWordsGrouped() {
     await db.words.update(w.id!, { groupIds: [target.id], updatedAt: now });
   }
   scheduleSync();
+}
+
+/**
+ * Preset groups the admin marked as default appear in everyone's library
+ * automatically. Each one is materialized once per account and device
+ * (seen ids tracked in localStorage), so a user who deletes a default group
+ * doesn't get it back on this device. Runs after a sync pull, so groups that
+ * already synced from another device win the name check and are only marked
+ * as seen. Best effort: when the fetch fails (offline), we retry on the next
+ * app start.
+ */
+let presetSeedDone = false;
+export async function seedDefaultPresetGroups() {
+  if (presetSeedDone) return;
+  const user = getUser();
+  if (!user) return;
+  const presets = await fetchPresetGroups();
+  if (!presets) return;
+  presetSeedDone = true;
+  const defaults = presets.filter((p) => p.isDefault);
+  if (defaults.length === 0) return;
+
+  const key = `vokabi.seededPresets.${user.id}`;
+  let stored: unknown;
+  try {
+    stored = JSON.parse(localStorage.getItem(key) ?? "[]");
+  } catch {
+    stored = [];
+  }
+  const seen = new Set<string>(Array.isArray(stored) ? (stored as string[]) : []);
+
+  const names = new Set((await db.groups.toArray()).map((g) => g.name.trim().toLowerCase()));
+  let changed = false;
+  for (const p of defaults) {
+    if (seen.has(p.id)) continue;
+    const nameKey = p.name.trim().toLowerCase();
+    if (!names.has(nameKey)) {
+      const id = (await db.groups.add({ name: p.name, createdAt: Date.now() })) as number;
+      if (p.words.length > 0) {
+        await addWordsFromText(p.words.join("\n"), [id]);
+      }
+      names.add(nameKey);
+    }
+    seen.add(p.id);
+    changed = true;
+  }
+  if (changed) localStorage.setItem(key, JSON.stringify([...seen]));
 }
 
 /** Retry enrichment for words that previously failed (e.g. added offline) */

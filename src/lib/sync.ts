@@ -5,7 +5,7 @@ import { db, onLocalMutation, withRemoteWrites } from "./db";
 import { getSupabase } from "./supabase";
 import { getUser } from "./auth";
 // circular with words.ts (it imports scheduleSync); safe, both only call at runtime
-import { ensureWordsGrouped } from "./words";
+import { ensureWordsGrouped, seedDefaultPresetGroups } from "./words";
 import type { Article, PartOfSpeech, Word, WordStatus } from "./types";
 
 export interface SyncState {
@@ -223,6 +223,11 @@ export async function syncNow(): Promise<void> {
     // and re-home any words whose groups didn't survive the merge so they
     // stay visible on the library page
     await ensureWordsGrouped();
+
+    // admin-curated default preset groups: materialize any this account
+    // hasn't seen yet (after the pull, so synced copies win by name).
+    // Best effort, a failure here must not mark the sync as failed
+    await seedDefaultPresetGroups().catch(() => {});
 
     const now = Date.now();
     localStorage.setItem(LAST_SYNC_KEY, String(now));
