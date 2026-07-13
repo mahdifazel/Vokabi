@@ -3,7 +3,7 @@ import { getUser } from "./auth";
 import { buildWord, lookupWord, splitWordList, type ParsedInput } from "./dictionary";
 import { fetchPresetGroups } from "./presets";
 import { scheduleSync } from "./sync";
-import type { Word } from "./types";
+import type { Group, PartOfSpeech, Word } from "./types";
 
 /**
  * When the caller didn't pick any groups and exactly one group exists,
@@ -265,25 +265,57 @@ export function matchesQuery(word: Word, query: string): boolean {
 // Import / export
 // ---------------------------------------------------------------------------
 
-export function wordsToCSV(words: Word[]): string {
+/** Group names a word belongs to, for export (local numeric ids are device-specific). */
+function groupNamesFor(word: Word, nameById: Map<number, string>): string[] {
+  return word.groupIds.map((id) => nameById.get(id)).filter((n): n is string => !!n);
+}
+
+export function wordsToCSV(words: Word[], groups: Group[]): string {
+  const nameById = new Map(groups.filter((g) => g.id != null).map((g) => [g.id!, g.name]));
+  // quote on ; and \t too: parseCSV treats them as cell separators
   const esc = (s: string | undefined) =>
-    s == null ? "" : /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  const header = "german,article,english,plural,pos,ipa,example,notes,favorite";
+    s == null ? "" : /[",;\t\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const header = "german,article,english,plural,pos,ipa,example,notes,favorite,groups";
   const rows = words.map((w) =>
-    [w.german, w.article, w.english, w.plural, w.pos, w.ipa, w.example, w.notes, w.favorite ? "yes" : ""]
+    [
+      w.german,
+      w.article,
+      w.english,
+      w.plural,
+      w.pos,
+      w.ipa,
+      w.example,
+      w.notes,
+      w.favorite ? "yes" : "",
+      groupNamesFor(w, nameById).join(" | "),
+    ]
       .map(esc)
       .join(",")
   );
   return [header, ...rows].join("\n");
 }
 
-export function wordsToJSON(words: Word[]): string {
+/**
+ * JSON export carries group membership as names (local ids differ per device)
+ * plus the full group list, so empty groups survive the round trip. Sync
+ * internals (uid, dirty) stay on the device.
+ */
+export function wordsToJSON(words: Word[], groups: Group[]): string {
+  const nameById = new Map(groups.filter((g) => g.id != null).map((g) => [g.id!, g.name]));
   return JSON.stringify(
-    words.map((w) => {
-      const copy: Partial<Word> = { ...w };
-      delete copy.id;
-      return copy;
-    }),
+    {
+      version: 2,
+      groups: groups.map((g) => g.name),
+      words: words.map((w) => {
+        const copy: Partial<Word> & { groups?: string[] } = { ...w };
+        delete copy.id;
+        delete copy.uid;
+        delete copy.dirty;
+        delete copy.groupIds;
+        copy.groups = groupNamesFor(w, nameById);
+        return copy;
+      }),
+    },
     null,
     2
   );
@@ -321,14 +353,57 @@ export function parseCSV(text: string): string[][] {
   return rows;
 }
 
+export interface ImportResult {
+  words: number;
+  groups: number;
+}
+
+/** Case-insensitive name → local group id, spanning one import run. */
+async function loadGroupNameCache(): Promise<Map<string, number>> {
+  const cache = new Map<string, number>();
+  for (const g of await db.groups.toArray()) {
+    if (g.id != null) cache.set(g.name.trim().toLowerCase(), g.id);
+  }
+  return cache;
+}
+
+/**
+ * Resolve group names to local ids, creating groups that don't exist yet
+ * (case-insensitive match, like the preset "already added" check).
+ */
+async function groupIdsForNames(
+  names: string[],
+  cache: Map<string, number>,
+  created: { count: number }
+): Promise<number[]> {
+  const ids: number[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    let id = cache.get(key);
+    if (id == null) {
+      id = (await db.groups.add({ name, createdAt: Date.now() })) as number;
+      cache.set(key, id);
+      created.count++;
+    }
+    ids.push(id);
+  }
+  return [...new Set(ids)];
+}
+
 /**
  * Import words from a CSV/TXT file body. Recognizes an optional header row
  * and "german,english" style two-column files; single-column files are
- * treated like pasted lists.
+ * treated like pasted lists. A "groups" column (names separated by |) files
+ * each word into those groups, creating missing ones.
  */
-export async function importFromDelimited(text: string, groupIds: number[] = []): Promise<number> {
+export async function importFromDelimited(
+  text: string,
+  groupIds: number[] = []
+): Promise<ImportResult> {
   const rows = parseCSV(text);
-  if (rows.length === 0) return 0;
+  if (rows.length === 0) return { words: 0, groups: 0 };
   groupIds = await resolveTargetGroups(groupIds);
 
   let start = 0;
@@ -342,15 +417,25 @@ export async function importFromDelimited(text: string, groupIds: number[] = [])
     : rows[0].length > 1
       ? 1
       : -1;
+  const groupsCol = isHeader ? Math.max(first.indexOf("groups"), first.indexOf("group")) : -1;
   if (isHeader) start = 1;
 
+  const cache = await loadGroupNameCache();
+  const created = { count: 0 };
   let count = 0;
+  let orphaned = false;
   const now = Date.now();
   const pending: { input: ParsedInput; word: Word }[] = [];
   for (let i = start; i < rows.length; i++) {
     const german = rows[i][germanCol]?.trim();
     if (!german) continue;
     const english = englishCol >= 0 ? rows[i][englishCol]?.trim() : undefined;
+    let rowGroupIds = groupIds;
+    if (groupsCol >= 0) {
+      const names = (rows[i][groupsCol] ?? "").split("|");
+      const resolved = await groupIdsForNames(names, cache, created);
+      if (resolved.length > 0) rowGroupIds = resolved;
+    }
     const m = german.match(/^(der|die|das)\s+(.+)$/i);
     const input: ParsedInput = m
       ? { german: m[2].trim(), articleHint: m[1].toLowerCase() as never }
@@ -358,7 +443,7 @@ export async function importFromDelimited(text: string, groupIds: number[] = [])
 
     const existing = await db.words.where("german").equalsIgnoreCase(input.german).first();
     if (existing?.id != null) {
-      const merged = [...new Set([...existing.groupIds, ...groupIds])];
+      const merged = [...new Set([...existing.groupIds, ...rowGroupIds])];
       await db.words.update(existing.id, { groupIds: merged, updatedAt: now });
       continue;
     }
@@ -367,6 +452,115 @@ export async function importFromDelimited(text: string, groupIds: number[] = [])
       article: input.articleHint,
       english: english || undefined,
       favorite: 0,
+      groupIds: rowGroupIds,
+      status: english ? "ready" : "pending",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const id = (await db.words.add(word)) as number;
+    count++;
+    if (rowGroupIds.length === 0) orphaned = true;
+    if (!english) pending.push({ input, word: { ...word, id } });
+  }
+  // words that landed without a group would be invisible on the library page
+  if (orphaned) await ensureWordsGrouped();
+  void enrichWords(pending);
+  return { words: count, groups: created.count };
+}
+
+const POS_VALUES: readonly PartOfSpeech[] = [
+  "noun",
+  "verb",
+  "adjective",
+  "adverb",
+  "pronoun",
+  "preposition",
+  "conjunction",
+  "interjection",
+  "numeral",
+  "phrase",
+  "other",
+];
+
+function asText(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+/**
+ * Import a Vokabi JSON export: either the current { version, groups, words }
+ * shape (group membership as names) or a legacy bare word array. Missing
+ * groups are created by name; duplicate words merge group membership like
+ * pasted text does. Throws on unparseable input so the UI can say so.
+ */
+export async function importFromJSON(text: string): Promise<ImportResult> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Not a valid JSON file");
+  }
+  const root = parsed as { groups?: unknown; words?: unknown };
+  const entries = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(root?.words)
+      ? (root.words as unknown[])
+      : null;
+  if (!entries) throw new Error("Unrecognized JSON format");
+
+  const cache = await loadGroupNameCache();
+  const created = { count: 0 };
+
+  // recreate the exported group list first, so even empty groups come back
+  if (!Array.isArray(parsed) && Array.isArray(root.groups)) {
+    await groupIdsForNames(
+      root.groups.filter((g): g is string => typeof g === "string"),
+      cache,
+      created
+    );
+  }
+
+  const defaultGroups = await resolveTargetGroups([]);
+  const now = Date.now();
+  const pending: { input: ParsedInput; word: Word }[] = [];
+  let count = 0;
+  let orphaned = false;
+
+  for (const raw of entries) {
+    if (!raw || typeof raw !== "object") continue;
+    const entry = raw as Record<string, unknown>;
+    const german = asText(entry.german);
+    if (!german) continue;
+    const names = Array.isArray(entry.groups)
+      ? (entry.groups as unknown[]).filter((g): g is string => typeof g === "string")
+      : [];
+    const groupIds =
+      names.length > 0 ? await groupIdsForNames(names, cache, created) : defaultGroups;
+
+    const existing = await db.words.where("german").equalsIgnoreCase(german).first();
+    if (existing?.id != null) {
+      const merged = [...new Set([...existing.groupIds, ...groupIds])];
+      if (merged.length !== existing.groupIds.length) {
+        await db.words.update(existing.id, { groupIds: merged, updatedAt: now });
+      }
+      continue;
+    }
+
+    const article = asText(entry.article)?.toLowerCase();
+    const pos = asText(entry.pos)?.toLowerCase();
+    const english = asText(entry.english);
+    const word: Word = {
+      german,
+      article:
+        article === "der" || article === "die" || article === "das" ? article : undefined,
+      english,
+      plural: asText(entry.plural),
+      ipa: asText(entry.ipa),
+      pos: POS_VALUES.includes(pos as PartOfSpeech) ? (pos as PartOfSpeech) : undefined,
+      example: asText(entry.example),
+      exampleEn: asText(entry.exampleEn),
+      notes: asText(entry.notes),
+      favorite:
+        entry.favorite === 1 || entry.favorite === true || entry.favorite === "yes" ? 1 : 0,
       groupIds,
       status: english ? "ready" : "pending",
       createdAt: now,
@@ -374,10 +568,18 @@ export async function importFromDelimited(text: string, groupIds: number[] = [])
     };
     const id = (await db.words.add(word)) as number;
     count++;
-    if (!english) pending.push({ input, word: { ...word, id } });
+    if (groupIds.length === 0) orphaned = true;
+    if (!english) {
+      pending.push({
+        input: { german, articleHint: word.article },
+        word: { ...word, id },
+      });
+    }
   }
+
+  if (orphaned) await ensureWordsGrouped();
   void enrichWords(pending);
-  return count;
+  return { words: count, groups: created.count };
 }
 
 export function downloadFile(filename: string, content: string, mime: string) {

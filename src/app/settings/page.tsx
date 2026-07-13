@@ -17,9 +17,11 @@ import { getGermanVoices, speak } from "@/lib/tts";
 import {
   downloadFile,
   importFromDelimited,
+  importFromJSON,
   retryPendingLookups,
   wordsToCSV,
   wordsToJSON,
+  type ImportResult,
 } from "@/lib/words";
 import { clearDiagLog, getDiagLog } from "@/lib/diag";
 import { Button, Card, Collapsible, Segmented, Switch, cn } from "@/components/ui";
@@ -84,19 +86,29 @@ export default function SettingsPage() {
   }
 
   async function handleImportFile(file: File) {
-    const text = await file.text();
-    const n = await importFromDelimited(text);
-    setImportMsg(`Imported ${n} new word${n === 1 ? "" : "s"} from ${file.name}`);
+    try {
+      const text = await file.text();
+      const isJson =
+        /\.json$/i.test(file.name) || /^[[{]/.test(text.trimStart());
+      const res: ImportResult = isJson
+        ? await importFromJSON(text)
+        : await importFromDelimited(text);
+      const parts = [`${res.words} new word${res.words === 1 ? "" : "s"}`];
+      if (res.groups > 0) parts.push(`${res.groups} new group${res.groups === 1 ? "" : "s"}`);
+      setImportMsg(`Imported ${parts.join(" and ")} from ${file.name}`);
+    } catch {
+      setImportMsg(`Couldn't import ${file.name}`);
+    }
     setTimeout(() => setImportMsg(""), 4000);
   }
 
   async function handleExport(format: "csv" | "json") {
-    const words = await db.words.toArray();
+    const [words, groups] = await Promise.all([db.words.toArray(), db.groups.toArray()]);
     const stamp = new Date().toISOString().slice(0, 10);
     if (format === "csv") {
-      downloadFile(`vokabi-${stamp}.csv`, wordsToCSV(words), "text/csv;charset=utf-8");
+      downloadFile(`vokabi-${stamp}.csv`, wordsToCSV(words, groups), "text/csv;charset=utf-8");
     } else {
-      downloadFile(`vokabi-${stamp}.json`, wordsToJSON(words), "application/json");
+      downloadFile(`vokabi-${stamp}.json`, wordsToJSON(words, groups), "application/json");
     }
   }
 
@@ -269,7 +281,7 @@ export default function SettingsPage() {
         </p>
         <div className="flex flex-wrap gap-2 py-3">
           <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()}>
-            <FileUp size={16} /> Import TXT / CSV
+            <FileUp size={16} /> Import file
           </Button>
           <Button variant="secondary" size="sm" onClick={() => void handleExport("csv")}>
             <Download size={16} /> Export CSV
@@ -299,7 +311,7 @@ export default function SettingsPage() {
         <input
           ref={fileRef}
           type="file"
-          accept=".txt,.csv,.tsv,text/plain,text/csv"
+          accept=".txt,.csv,.tsv,.json,text/plain,text/csv,application/json"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
