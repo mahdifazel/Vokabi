@@ -6,8 +6,9 @@ import { getSupabase } from "./supabase";
 /**
  * Clients for the server-side AI routes (Groq, configured in the back
  * office). Every helper returns null whenever AI cannot be used — local-only
- * mode, signed out, key not configured, Groq down, timeout, or an empty
- * result — so callers can fall back to the next on-device step. Never throws.
+ * mode, signed out, key not configured, Groq down, or timeout — so callers
+ * can fall back to the next on-device step. An empty array is a real answer:
+ * the AI looked and found no vocabulary. Never throws.
  */
 
 async function getSessionToken(): Promise<string | null> {
@@ -35,11 +36,9 @@ async function postForWords(
   if (!res.ok) return null;
 
   const json = (await res.json()) as { words?: unknown };
-  const words = Array.isArray(json.words)
+  return Array.isArray(json.words)
     ? json.words.filter((w): w is string => typeof w === "string" && w.trim().length > 0)
     : [];
-  // an empty AI answer is treated as a miss so the next fallback gets a chance
-  return words.length > 0 ? words : null;
 }
 
 /** Pull the vocabulary out of raw OCR text. */

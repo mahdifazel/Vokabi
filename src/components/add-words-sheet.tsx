@@ -35,6 +35,7 @@ export function AddWordsSheet({
   const [done, setDone] = useState(0);
   const [scanState, setScanState] = useState<OcrProgress | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanNotice, setScanNotice] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -102,23 +103,27 @@ export function AddWordsSheet({
 
   async function handleScan(source: File | HTMLCanvasElement) {
     setScanError(null);
+    setScanNotice(null);
     setScanState({ phase: "preparing" });
     try {
       const canvas = await downscaleToCanvas(source);
 
       // vision first: the photo goes straight to a Groq vision model
-      // (configured in the back office); null means unavailable or failed
+      // (configured in the back office); null means unavailable or failed,
+      // an empty array means the AI saw no vocabulary in the photo
       setScanState({ phase: "analyzing" });
       let words = await extractWordsFromImageWithAi(canvas);
+      let aiUsed = words !== null;
 
-      if (!words) {
+      if (words === null) {
         // fallback: on-device OCR, then AI text cleanup, then heuristic lines
         const { rawText, lines } = await recognizeGerman(canvas, setScanState);
         if (rawText) {
           setScanState({ phase: "analyzing" });
           words = await extractWordsWithAi(rawText);
+          aiUsed = words !== null;
         }
-        if (!words) words = lines;
+        if (words === null) words = lines;
       }
 
       const sentenceCount = words.filter(isSentence).length;
@@ -135,6 +140,11 @@ export function AddWordsSheet({
         );
       } else {
         setText((t) => (t ? t + "\n" + words.join("\n") : words.join("\n")));
+        if (!aiUsed) {
+          setScanNotice(
+            "The AI scan wasn't available, so basic text recognition was used. Results may be less accurate."
+          );
+        }
       }
     } catch {
       setScanError("Could not read that photo. Please try again.");
@@ -161,6 +171,7 @@ export function AddWordsSheet({
         onChange={(e) => {
           setText(e.target.value);
           setScanError(null);
+          setScanNotice(null);
         }}
         placeholder={"Haus\nBaum\nAuto\nFenster"}
         autoFocus
@@ -180,6 +191,7 @@ export function AddWordsSheet({
             onClick={() => {
               setText("");
               setScanError(null);
+              setScanNotice(null);
             }}
             aria-label="Clear text"
             className="inline-flex cursor-pointer items-center rounded-xl p-1.5 text-muted active:opacity-70"
@@ -247,6 +259,9 @@ export function AddWordsSheet({
       )}
       {scanError && (
         <p className="mt-2 text-sm font-semibold text-destructive">{scanError}</p>
+      )}
+      {scanNotice && (
+        <p className="mt-2 text-sm font-semibold text-muted">{scanNotice}</p>
       )}
 
       {groups.length > 1 && (

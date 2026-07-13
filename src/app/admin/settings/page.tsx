@@ -193,7 +193,7 @@ export default function AdminSettingsPage() {
             className="mt-1"
             value={visionModel}
             onChange={(e) => setVisionModel(e.target.value)}
-            placeholder="meta-llama/llama-4-scout-17b-16e-instruct"
+            placeholder="qwen/qwen3.6-27b"
             aria-label="Groq vision model id"
           />
         </label>

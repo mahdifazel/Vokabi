@@ -4,6 +4,7 @@ import {
   callGroqChat,
   loadGroqSettings,
   parseWordList,
+  reasoningParams,
 } from "../_shared";
 import { MAX_SCAN_SENTENCES, MAX_SCAN_WORDS } from "@/lib/scan-rules";
 
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
       {
         model: settings.visionModel,
         max_tokens: 2048,
+        ...reasoningParams(settings.visionModel),
         messages: [
           {
             role: "user",

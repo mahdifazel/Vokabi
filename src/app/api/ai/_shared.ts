@@ -11,7 +11,18 @@ import { isSentence, MAX_SCAN_SENTENCES, MAX_SCAN_WORDS } from "@/lib/scan-rules
  */
 
 export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
-export const DEFAULT_GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+// llama-4-scout was deprecated by Groq (shutdown 2026-07-17); qwen3.6 is their
+// recommended vision replacement
+export const DEFAULT_GROQ_VISION_MODEL = "qwen/qwen3.6-27b";
+
+/**
+ * Qwen models on Groq default to thinking mode, whose reasoning tokens count
+ * against max_tokens and can starve the JSON answer; turn it off. Other
+ * models reject the parameter, so it is only sent where it applies.
+ */
+export function reasoningParams(model: string): { reasoning_effort?: "none" } {
+  return model.startsWith("qwen/") ? { reasoning_effort: "none" } : {};
+}
 
 /** Verify the caller's Supabase session; any signed-in user passes. */
 export async function authenticateUser(
@@ -78,6 +89,7 @@ export async function callGroqChat(
     model: string;
     messages: { role: "system" | "user"; content: GroqMessageContent }[];
     max_tokens: number;
+    reasoning_effort?: "none";
   },
   timeoutMs: number
 ): Promise<{ content: string } | { error: NextResponse }> {
@@ -112,7 +124,12 @@ export async function callGroqChat(
  * example sentences.
  */
 export function parseWordList(content: string): string[] {
-  const parsed = JSON.parse(content) as { words?: unknown };
+  // tolerate models that wrap the JSON in think tags or markdown fences
+  const cleaned = content.replace(/<think>[\s\S]*?<\/think>/g, "");
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  const json = start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned;
+  const parsed = JSON.parse(json) as { words?: unknown };
   const seen = new Set<string>();
   const words: string[] = [];
   let wordCount = 0;
