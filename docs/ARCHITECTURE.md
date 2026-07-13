@@ -77,7 +77,8 @@ photo → downscale on canvas (lib/image.ts, shared with OCR)
       → JPEG data URL → POST /api/ai/extract-words-image (Groq vision model,
                           key + model from app_settings): reads the vocabulary
                           straight off the photo, incl. handwriting
-        ↳ on ANY failure (no key, signed out, Groq down, timeout, empty result),
+        ↳ an empty answer is trusted ("no vocabulary in this photo"), no fallback
+        ↳ on failure (no key, signed out, Groq down, rate limited, timeout),
           fall back to the previous pipeline:
           Tesseract.js on-device (German model, assets self-hosted under /ocr/,
           cached offline after first download)
@@ -88,7 +89,7 @@ photo → downscale on canvas (lib/image.ts, shared with OCR)
       → detected words land in the add-words textarea for review
 ```
 
-The AI steps are server-side only (`lib/ai.ts` returns `null` on failure so callers fall back); the Groq key never reaches the client. Local-only and signed-out scans skip both uploads and stay fully on-device.
+The AI steps are server-side only (`lib/ai.ts` returns `null` on failure and `"rate-limited"` on a Groq 429 so callers fall back; an empty array is a real answer). When a scan does fall back, the add-words sheet says so — a "scanner is busy, retry in a minute" notice for rate limits, a "basic recognition was used" notice otherwise — so degraded results are never silent. The Groq key never reaches the client. Local-only and signed-out scans skip both uploads and stay fully on-device.
 
 Scans are capped at **40 word entries and 20 sentence entries**, counted separately. The caps and the word-vs-sentence classifier (`isSentence`: four or more tokens, or a short entry ending in sentence punctuation) live in `lib/scan-rules.ts`, a pure module imported by both the AI routes (prompt limits + parse truncation) and the add-words sheet (which reports which limit a too-busy photo exceeded).
 
@@ -146,7 +147,7 @@ The back office UI (`/admin`) is a desktop sidebar layout (mobile: top bar with 
 
 ### 7. AI routes (src/app/api/ai/*)
 
-Two non-admin server routes accept requests from **any signed-in user** (bearer token verified via the service-role client, no allowlist) and share their plumbing in `src/app/api/ai/_shared.ts` (auth, `app_settings` read, Groq call, word-list parsing). `/api/ai/extract-words-image` takes a downscaled JPEG data URL and asks the configured vision model (default Llama 4 Scout, key `groq_vision_model`) for a JSON list of vocabulary entries read straight off the photo. `/api/ai/extract-words` takes raw OCR text and asks the text model (default Llama 3.3, key `groq_model`) to clean it up. Both run at temperature 0 with capped input and output, 25/20-second timeouts, prompts forbidding invented words, and per-kind entry caps (40 words / 20 sentences, shared with the client via `lib/scan-rules.ts`). Every failure mode returns a non-200 status; the client helpers (`lib/ai.ts`) convert any of them to `null`, which callers treat as "use the next fallback" (vision → on-device OCR + text cleanup → heuristics). This means AI outages degrade the scan quality, never break the feature.
+Two non-admin server routes accept requests from **any signed-in user** (bearer token verified via the service-role client, no allowlist) and share their plumbing in `src/app/api/ai/_shared.ts` (auth, `app_settings` read, Groq call, word-list parsing). `/api/ai/extract-words-image` takes a downscaled JPEG data URL and asks the configured vision model (default `qwen/qwen3.6-27b` — Groq deprecated Llama 4 Scout for 2026-07-17 — key `groq_vision_model`) for a JSON list of vocabulary entries read straight off the photo. `/api/ai/extract-words` takes raw OCR text and asks the text model (default Llama 3.3, key `groq_model`) to clean it up. Both run at temperature 0 with capped input and output, 25/20-second timeouts, prompts forbidding invented words, and per-kind entry caps (40 words / 20 sentences, shared with the client via `lib/scan-rules.ts`); Qwen models get `reasoning_effort: "none"` so thinking tokens don't eat the output budget, and the word-list parser tolerates think tags and markdown fences. Every failure mode returns a non-200 status — a Groq 429 passes through as 429, everything else becomes 502; the client helpers (`lib/ai.ts`) convert them to `"rate-limited"` or `null`, which callers treat as "use the next fallback" (vision → on-device OCR + text cleanup → heuristics) while telling the user the scan was degraded. This means AI outages degrade the scan quality, never break the feature.
 
 ## Key technical decisions
 
@@ -172,7 +173,7 @@ Flagged honestly for future work:
 - **No analytics/telemetry** — usage is unknown beyond Supabase table sizes
 - **Settings are per-device** (localStorage), deliberately not synced — undocumented in the UI
 - Wiktionary/MyMemory are called client-side without keys; their rate limits are unenforced and failures degrade to "notfound" silently (a "Retry lookups" button exists in Settings, and words still "pending" resume automatically at startup/after sync pulls)
-- The `/api/ai/*` routes (`extract-words`, `extract-words-image`) have no per-user rate limiting: any signed-in user can spend the Groq quota (free tier is generous; revisit if usage grows)
+- The `/api/ai/*` routes (`extract-words`, `extract-words-image`) have no per-user rate limiting: any signed-in user can spend the Groq quota. The free tier is tight in practice (bursts of vision scans 429 within a minute); the client shows a "scanner is busy" notice, and a paid Groq tier is the fix if it happens often
 - `{{de-noun}}` plural parsing is best-effort; unusual template forms yield no plural
 - No in-app "forgot password" flow — resets are triggered from the back office or the Supabase dashboard
 - Supabase dashboard configuration (Site URL, redirect URLs, email confirmation off) lives outside the repo with no infrastructure-as-code
