@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { ARTICLE_BG, type Article } from "@/lib/types";
-import { deleteWord, setWordGroups, toggleFavorite } from "@/lib/words";
+import { deleteWord, ensureWordsGrouped, toggleFavorite } from "@/lib/words";
 import { playWordOnce, wordSpokenText } from "@/lib/player";
 import { speak } from "@/lib/tts";
 import { getSettings } from "@/lib/settings";
@@ -47,6 +47,7 @@ export default function WordDetailPage({
     example: "",
     exampleEn: "",
     notes: "",
+    groupIds: [] as number[],
   });
 
   if (word === undefined) return null; // loading
@@ -71,6 +72,7 @@ export default function WordDetailPage({
       example: word.example ?? "",
       exampleEn: word.exampleEn ?? "",
       notes: word.notes ?? "",
+      groupIds: word.groupIds,
     });
     setEditOpen(true);
   }
@@ -85,9 +87,12 @@ export default function WordDetailPage({
       example: draft.example.trim() || undefined,
       exampleEn: draft.exampleEn.trim() || undefined,
       notes: draft.notes.trim() || undefined,
+      groupIds: draft.groupIds,
       status: "ready",
       updatedAt: Date.now(),
     });
+    // a word saved without any group would be invisible on the library page
+    if (draft.groupIds.length === 0) await ensureWordsGrouped();
     setEditOpen(false);
   }
 
@@ -99,12 +104,13 @@ export default function WordDetailPage({
     });
   }
 
-  async function toggleGroup(groupId: number) {
-    const has = word!.groupIds.includes(groupId);
-    await setWordGroups(
-      wordId,
-      has ? word!.groupIds.filter((g) => g !== groupId) : [...word!.groupIds, groupId]
-    );
+  function toggleDraftGroup(groupId: number) {
+    setDraft((d) => ({
+      ...d,
+      groupIds: d.groupIds.includes(groupId)
+        ? d.groupIds.filter((g) => g !== groupId)
+        : [...d.groupIds, groupId],
+    }));
   }
 
   return (
@@ -199,34 +205,6 @@ export default function WordDetailPage({
         </div>
       </div>
 
-      {/* Groups: first card so membership is visible without scrolling */}
-      <Card className="mb-3 p-4">
-        <p className="mb-2 text-xs font-extrabold tracking-wide text-muted uppercase">Groups</p>
-        {groups.length === 0 ? (
-          <p className="text-sm font-semibold text-muted">
-            No groups yet. Create one in the Groups tab.
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {groups.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => toggleGroup(g.id!)}
-                aria-pressed={word.groupIds.includes(g.id!)}
-                className={cn(
-                  "cursor-pointer rounded-full px-4 py-2 text-sm font-bold transition-all active:scale-95",
-                  word.groupIds.includes(g.id!)
-                    ? "bg-primary text-on-primary"
-                    : "bg-surface-2 text-muted"
-                )}
-              >
-                {g.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </Card>
-
       {/* Example (verbs show it in the verb section instead) */}
       {word.pos !== "verb" && (word.example || word.exampleEn) && (
         <Card className="mb-3 p-4">
@@ -313,6 +291,32 @@ export default function WordDetailPage({
                 </button>
               ))}
             </div>
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-extrabold">Groups</p>
+            {groups.length === 0 ? (
+              <p className="text-sm font-semibold text-muted">
+                No groups yet. Create one from the library.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {groups.map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => toggleDraftGroup(g.id!)}
+                    aria-pressed={draft.groupIds.includes(g.id!)}
+                    className={cn(
+                      "cursor-pointer rounded-full px-4 py-2 text-sm font-bold transition-all active:scale-95",
+                      draft.groupIds.includes(g.id!)
+                        ? "bg-primary text-on-primary"
+                        : "bg-surface-2 text-muted"
+                    )}
+                  >
+                    {g.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <label className="text-sm font-extrabold">
             English translation

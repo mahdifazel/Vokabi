@@ -195,10 +195,6 @@ export async function toggleFavorite(word: Word) {
   });
 }
 
-export async function setWordGroups(wordId: number, groupIds: number[]) {
-  await db.words.update(wordId, { groupIds, updatedAt: Date.now() });
-}
-
 export async function deleteWord(wordId: number) {
   const word = await db.words.get(wordId);
   await db.transaction("rw", db.words, db.outbox, async () => {

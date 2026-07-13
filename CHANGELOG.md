@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- On the word detail page the **Groups card now sits directly under the play buttons** (previously below Example and Notes), so group membership is visible and editable without scrolling
+- **Group membership moved into the word edit sheet.** The word detail page no longer shows the full group chip list; the Groups selector now lives in the edit sheet (below Article) and is saved together with the other fields via Save changes. A word saved with no groups is re-homed to General so it stays visible in the library
 
 ## [1.5.0] - 2026-07-12
 
