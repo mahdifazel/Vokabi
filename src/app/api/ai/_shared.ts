@@ -174,6 +174,7 @@ export async function callGemini(
   parts: GeminiPart[],
   timeoutMs: number
 ): Promise<{ content: string } | { error: NextResponse }> {
+  const started = Date.now();
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
@@ -212,6 +213,7 @@ export async function callGemini(
   const content = (json.candidates?.[0]?.content?.parts ?? [])
     .map((p) => p.text ?? "")
     .join("");
+  console.log(`Gemini ${model} answered in ${Date.now() - started}ms`);
   return { content };
 }
 
@@ -252,7 +254,8 @@ export async function extractWordsViaProviders(
         settings.gemini.apiKey,
         settings.gemini.model,
         geminiParts(input),
-        input.kind === "image" ? 15_000 : 12_000
+        // TODO(debug): temporarily generous while measuring real latency
+        input.kind === "image" ? 40_000 : 40_000
       );
       if ("error" in result) {
         if (result.error.status === 429) rateLimited = true;
