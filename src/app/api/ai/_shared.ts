@@ -256,8 +256,7 @@ export async function extractWordsViaProviders(
         settings.gemini.apiKey,
         settings.gemini.model,
         geminiParts(input),
-        // TODO(debug): temporarily generous while measuring real latency
-        input.kind === "image" ? 40_000 : 40_000
+        input.kind === "image" ? 15_000 : 12_000
       );
       if ("error" in result) {
         if (result.error.status === 429) rateLimited = true;

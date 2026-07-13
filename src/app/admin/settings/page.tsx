@@ -189,7 +189,7 @@ function GeminiCard({
           className="mt-1"
           value={model}
           onChange={(e) => setModel(e.target.value)}
-          placeholder="gemini-flash-latest"
+          placeholder="gemini-flash-lite-latest"
           aria-label="Gemini model id"
         />
       </label>
