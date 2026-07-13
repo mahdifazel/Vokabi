@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Default preset groups.** Presets can be flagged as default in the back office (star toggle on the row, switch in the create form); after a sync pull the app seeds unseen default presets into the user's library as normal groups. Processed preset ids are tracked per account in localStorage so a deleted default group stays deleted on that device. Requires the new `is_default` column (rerun `supabase/admin-schema.sql`)
 
+### Changed
+
+- On the word detail page the **Groups card now sits directly under the play buttons** (previously below Example and Notes), so group membership is visible and editable without scrolling
+
 ## [1.5.0] - 2026-07-12
 
 ### Added

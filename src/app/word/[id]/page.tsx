@@ -199,26 +199,7 @@ export default function WordDetailPage({
         </div>
       </div>
 
-      {/* Example (verbs show it in the verb section below Groups instead) */}
-      {word.pos !== "verb" && (word.example || word.exampleEn) && (
-        <Card className="mb-3 p-4">
-          <p className="mb-1 text-xs font-extrabold tracking-wide text-muted uppercase">
-            Example
-          </p>
-          {word.example && <p className="font-bold">{word.example}</p>}
-          {word.exampleEn && <p className="text-sm font-semibold text-muted">{word.exampleEn}</p>}
-        </Card>
-      )}
-
-      {/* Notes */}
-      {word.notes && (
-        <Card className="mb-3 p-4">
-          <p className="mb-1 text-xs font-extrabold tracking-wide text-muted uppercase">Notes</p>
-          <p className="text-sm font-semibold whitespace-pre-wrap">{word.notes}</p>
-        </Card>
-      )}
-
-      {/* Groups */}
+      {/* Groups: first card so membership is visible without scrolling */}
       <Card className="mb-3 p-4">
         <p className="mb-2 text-xs font-extrabold tracking-wide text-muted uppercase">Groups</p>
         {groups.length === 0 ? (
@@ -245,6 +226,25 @@ export default function WordDetailPage({
           </div>
         )}
       </Card>
+
+      {/* Example (verbs show it in the verb section instead) */}
+      {word.pos !== "verb" && (word.example || word.exampleEn) && (
+        <Card className="mb-3 p-4">
+          <p className="mb-1 text-xs font-extrabold tracking-wide text-muted uppercase">
+            Example
+          </p>
+          {word.example && <p className="font-bold">{word.example}</p>}
+          {word.exampleEn && <p className="text-sm font-semibold text-muted">{word.exampleEn}</p>}
+        </Card>
+      )}
+
+      {/* Notes */}
+      {word.notes && (
+        <Card className="mb-3 p-4">
+          <p className="mb-1 text-xs font-extrabold tracking-wide text-muted uppercase">Notes</p>
+          <p className="text-sm font-semibold whitespace-pre-wrap">{word.notes}</p>
+        </Card>
+      )}
 
       {/* Verb details: example, Perfekt, conjugation, grammar */}
       {word.pos === "verb" && <VerbDetails word={word} />}
