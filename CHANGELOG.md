@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Gemini is the primary AI for photo scans, with Groq as fallback.** Both AI routes now try Gemini first (default model `gemini-flash-lite-latest`) and fall back to Groq when Gemini fails or is unavailable; if both fail, the scan still degrades gracefully to on-device OCR and heuristics. The back office System settings page gains a second provider card (key, model id, Test connection, Remove); the Gemini key can come from the `GEMINI_API_KEY` env var, and a key saved in the back office overrides it without a redeploy. Responses carry a diagnostic `provider` field and Gemini failures are logged to the function logs
+
+- **Degraded scans are announced.** When the AI scanner is rate limited or unavailable and a photo scan falls back to basic on-device text recognition, the add-words sheet now says so instead of silently returning worse results
+
 - **Export/import now round-trips groups.** CSV exports gain a `groups` column (names separated by `|`) and JSON exports carry group names per word plus the full group list, so empty groups survive too. Importing (the file picker now also accepts `.json`) creates any groups that don't exist yet, matched case-insensitively by name, and files every word into its groups; words without group info fall back to the previous behavior. JSON exports no longer include device/sync internals (`uid`, `dirty`, local ids)
 
 - **Default preset groups.** Presets can be flagged as default in the back office (star toggle on the row, switch in the create form); after a sync pull the app seeds unseen default presets into the user's library as normal groups, and unflagging or deleting the preset removes the seeded group again on the next pass (words shared with other groups are kept). Processed preset ids and the created group uids are tracked per account in localStorage, so removal never touches a user's own groups and a user-deleted default group stays deleted on that device. Requires the new `is_default` column (rerun `supabase/admin-schema.sql`)
@@ -18,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Words no longer get stuck on "looking up…".** Enrichment is background browser work, so closing, reloading, or backgrounding the app aborted it mid-queue (easy to hit with large seeded default groups), and words synced from another device could arrive still pending with nothing retrying them. Pending words are now resumed automatically at startup and after each sync pull, with an in-flight guard so a word is never enriched twice at once
 
 ### Changed
+
+- **The add-words group picker is a single scrollable row.** The "Add to groups" chips no longer wrap into a tall block: they sit in one horizontal row that scrolls sideways without a visible scrollbar, selected groups always sort to the front, and selecting a chip scrolls the row back to the start so the selection stays visible
+
+- **The photo scan's Groq vision model default is `qwen/qwen3.6-27b`** (Groq deprecated Llama 4 Scout for 2026-07-17), with thinking disabled so reasoning tokens don't truncate the answer
 
 - **Group membership moved into the word edit sheet.** The word detail page no longer shows the full group chip list; the Groups selector now lives in the edit sheet (below Article) and is saved together with the other fields via Save changes. A word saved with no groups is re-homed to General so it stays visible in the library
 

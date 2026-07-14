@@ -27,6 +27,7 @@ Until automated coverage exists, changes are verified against the affected flows
 - [ ] Photo scan: "Scan a photo" opens the in-app camera (or file picker without camera permission); a clear printed word list yields clean entries in the textarea; with a Gemini or Groq key configured the "Identifying words" phase runs (Gemini first, Groq as fallback); with all keys removed the scan still works (heuristic fallback); scans keep sentences whole and are capped at 40 words / 20 sentences with a matching error message
 - [ ] Delete a group that contains words → its words appear in General, not lost
 - [ ] Add-words sheet from the Library page has the first group preselected; from a group page that group is targeted
+- [ ] Add-words sheet "Add to groups" is a single horizontal row that scrolls sideways (no wrap, no visible scrollbar); selected groups sort to the front, and tapping a far-off chip scrolls the row back to the start
 
 **Audio** (needs a real Android phone for full confidence)
 - [ ] Single-word play; slow play on word detail
