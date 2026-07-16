@@ -2,6 +2,7 @@ import { db } from "./db";
 import { getUser } from "./auth";
 import { buildWord, lookupWord, splitWordList, type ParsedInput } from "./dictionary";
 import { fetchPresetGroups } from "./presets";
+import { scheduleExampleBackfill } from "./examples";
 import { scheduleSync } from "./sync";
 import type { Group, PartOfSpeech, Word } from "./types";
 
@@ -72,6 +73,8 @@ async function enrichWords(items: { input: ParsedInput; word: Word }[]) {
       }
     })
   );
+  // words whose lookup had no usable example get an AI-generated one
+  scheduleExampleBackfill();
 }
 
 // guards against the same word being enriched twice concurrently (e.g. a
@@ -92,6 +95,9 @@ async function enrichOne(input: ParsedInput, id: number) {
       ipa: built.ipa,
       pos: built.pos,
       status: built.status,
+      // only when the lookup found one, so a user-typed example survives
+      ...(built.example ? { example: built.example } : {}),
+      ...(built.exampleEn ? { exampleEn: built.exampleEn } : {}),
       updatedAt: Date.now(),
     });
   } catch {

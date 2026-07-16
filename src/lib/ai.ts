@@ -57,6 +57,55 @@ export async function extractWordsWithAi(rawText: string): Promise<AiWordsResult
   }
 }
 
+/** How many words each /api/ai/examples request may carry (server cap). */
+export const AI_EXAMPLE_BATCH = 10;
+
+export interface AiExampleWord {
+  german: string;
+  english?: string;
+  article?: string;
+  pos?: string;
+}
+
+export interface AiExample {
+  german: string;
+  example: string;
+  exampleEn: string;
+}
+
+export type AiExamplesResult = AiExample[] | "rate-limited" | null;
+
+/** Generate simple example sentences for words that have none. */
+export async function generateExamplesWithAi(words: AiExampleWord[]): Promise<AiExamplesResult> {
+  try {
+    const token = await getSessionToken();
+    if (!token) return null;
+    const res = await fetch("/api/ai/examples", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ words }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (res.status === 429) return "rate-limited";
+    if (!res.ok) return null;
+
+    const json = (await res.json()) as { examples?: unknown };
+    return (Array.isArray(json.examples) ? json.examples : []).filter(
+      (e): e is AiExample =>
+        typeof e === "object" && e !== null &&
+        typeof (e as AiExample).german === "string" &&
+        typeof (e as AiExample).example === "string" &&
+        (e as AiExample).example.trim().length > 0 &&
+        typeof (e as AiExample).exampleEn === "string"
+    );
+  } catch {
+    return null;
+  }
+}
+
 /** Pull the vocabulary straight out of a scanned photo via a vision model. */
 export async function extractWordsFromImageWithAi(
   canvas: HTMLCanvasElement

@@ -11,6 +11,7 @@ import { initAuth, useAuthReady, useUser } from "@/lib/auth";
 import { cloudConfigured } from "@/lib/supabase";
 import { initSync, syncNow } from "@/lib/sync";
 import { ensureWordsGrouped, resumePendingEnrichment } from "@/lib/words";
+import { scheduleExampleBackfill } from "@/lib/examples";
 import { MiniPlayer } from "./mini-player";
 import { Splash } from "./splash";
 import { AnnouncementBanner } from "./announcement-banner";
@@ -82,6 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!cloudConfigured()) {
       void ensureWordsGrouped();
       void resumePendingEnrichment();
+      scheduleExampleBackfill();
     }
     // keep "system" theme in sync when OS theme changes
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

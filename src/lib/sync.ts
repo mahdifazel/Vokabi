@@ -6,6 +6,7 @@ import { getSupabase } from "./supabase";
 import { getUser } from "./auth";
 // circular with words.ts (it imports scheduleSync); safe, both only call at runtime
 import { ensureWordsGrouped, resumePendingEnrichment, seedDefaultPresetGroups } from "./words";
+import { scheduleExampleBackfill } from "./examples";
 import type { Article, PartOfSpeech, Word, WordStatus } from "./types";
 
 export interface SyncState {
@@ -233,6 +234,10 @@ export async function syncNow(): Promise<void> {
     // this device, or rows that arrived pending from another device).
     // Fire-and-forget: enriching a big group can take minutes
     void resumePendingEnrichment();
+
+    // fill in example sentences for words that still lack one (delayed +
+    // batched; a no-op when everything has an example already)
+    scheduleExampleBackfill();
 
     const now = Date.now();
     localStorage.setItem(LAST_SYNC_KEY, String(now));

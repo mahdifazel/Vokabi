@@ -221,31 +221,44 @@ export async function callGemini(
 
 export type ExtractionInput =
   | { kind: "image"; prompt: string; image: string } // image = data URL
-  | { kind: "text"; prompt: string; text: string };
+  | { kind: "text"; prompt: string; text: string; textLabel?: string };
 
 function geminiParts(input: ExtractionInput): GeminiPart[] {
   if (input.kind === "text") {
-    return [{ text: `${input.prompt}\n\nOCR text:\n${input.text}` }];
+    return [{ text: `${input.prompt}\n\n${input.textLabel ?? "OCR text"}:\n${input.text}` }];
   }
   const match = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(input.image);
   if (!match) throw new Error("unreachable: image validated by the route");
   return [{ text: input.prompt }, { inline_data: { mime_type: match[1], data: match[2] } }];
 }
 
+export interface ProviderCallOptions {
+  geminiTimeoutMs?: number;
+  groqTimeoutMs?: number;
+  maxTokens?: number;
+}
+
 /**
- * Run the provider chain: Gemini first, Groq as fallback. Any Gemini failure
- * (not configured, HTTP error, timeout, unparseable output) moves on to Groq;
- * when both fail the client gets a 429 if either provider was rate limited
- * (retrying may help) and a 502 otherwise, and falls back to on-device OCR.
- * Timeouts are budgeted so a slow Gemini still leaves Groq room inside the
- * client's overall request timeout.
+ * Run the provider chain: Gemini first, Groq as fallback, handing the raw
+ * model output to `build` (throwing there counts as a provider failure and
+ * moves on). Any Gemini failure (not configured, HTTP error, timeout,
+ * unparseable output) moves on to Groq; when both fail the client gets a 429
+ * if either provider was rate limited (retrying may help) and a 502
+ * otherwise, and falls back to on-device processing. Timeouts are budgeted so
+ * a slow Gemini still leaves Groq room inside the client's overall request
+ * timeout.
  */
-export async function extractWordsViaProviders(
+export async function completeViaProviders(
   svc: SupabaseClient,
-  input: ExtractionInput
+  input: ExtractionInput,
+  build: (content: string, provider: "gemini" | "groq") => NextResponse,
+  opts: ProviderCallOptions = {}
 ): Promise<NextResponse> {
   const settings = await loadAiSettings(svc);
   if ("error" in settings) return settings.error;
+
+  const geminiTimeout = opts.geminiTimeoutMs ?? (input.kind === "image" ? 15_000 : 12_000);
+  const groqTimeout = opts.groqTimeoutMs ?? (input.kind === "image" ? 12_000 : 10_000);
 
   let rateLimited = false;
 
@@ -256,14 +269,13 @@ export async function extractWordsViaProviders(
         settings.gemini.apiKey,
         settings.gemini.model,
         geminiParts(input),
-        input.kind === "image" ? 15_000 : 12_000
+        geminiTimeout
       );
       if ("error" in result) {
         if (result.error.status === 429) rateLimited = true;
       } else {
         content = result.content;
-        // provider is diagnostic only; the client ignores it
-        return NextResponse.json({ words: parseWordList(content), provider: "gemini" });
+        return build(content, "gemini");
       }
     } catch (e) {
       // network failure, timeout or unparseable model output: try Groq
@@ -281,7 +293,7 @@ export async function extractWordsViaProviders(
         settings.groq.apiKey,
         {
           model,
-          max_tokens: 2048,
+          max_tokens: opts.maxTokens ?? 2048,
           ...reasoningParams(model),
           messages:
             input.kind === "image"
@@ -299,12 +311,12 @@ export async function extractWordsViaProviders(
                   { role: "user", content: input.text },
                 ],
         },
-        input.kind === "image" ? 12_000 : 10_000
+        groqTimeout
       );
       if ("error" in result) {
         if (result.error.status === 429) rateLimited = true;
       } else {
-        return NextResponse.json({ words: parseWordList(result.content), provider: "groq" });
+        return build(result.content, "groq");
       }
     } catch {
       // network failure, timeout or unparseable model output
@@ -314,6 +326,17 @@ export async function extractWordsViaProviders(
   return NextResponse.json(
     { error: rateLimited ? "AI is rate limited" : "AI analysis failed" },
     { status: rateLimited ? 429 : 502 }
+  );
+}
+
+/** The word-extraction flavor of the provider chain, used by both scan routes. */
+export function extractWordsViaProviders(
+  svc: SupabaseClient,
+  input: ExtractionInput
+): Promise<NextResponse> {
+  // provider is diagnostic only; the client ignores it
+  return completeViaProviders(svc, input, (content, provider) =>
+    NextResponse.json({ words: parseWordList(content), provider })
   );
 }
 

@@ -23,6 +23,10 @@ export type VerbCase = "Akkusativ" | "Dativ" | "Genitiv";
 export interface VerbInfo {
   infinitive: string;
   present: PresentConjugation;
+  /** full Präteritum table */
+  praeteritum: PresentConjugation;
+  /** 3rd-person-singular Präteritum principal part, e.g. "ging", "stand auf" */
+  praeteritumEr: string;
   /** e.g. "ist gegangen" */
   perfekt: string;
   aux: "haben" | "sein";
@@ -58,6 +62,8 @@ const FULL_PRESENT: Record<string, PresentConjugation> = {
 interface StrongEntry {
   /** past participle, e.g. "gegangen" */
   part: string;
+  /** Präteritum ich/er form, e.g. "ging"; a "-e" ending marks a weak/mixed stem */
+  praet: string;
   aux?: "sein";
   /** irregular du/er forms of the base verb, e.g. "gibst"/"gibt" */
   du?: string;
@@ -66,68 +72,68 @@ interface StrongEntry {
 
 /** Strong & mixed verbs (irregular participle, optional present stem change) */
 const STRONG: Record<string, StrongEntry> = {
-  sein: { part: "gewesen", aux: "sein" },
-  haben: { part: "gehabt" },
-  werden: { part: "geworden", aux: "sein" },
-  wissen: { part: "gewusst" },
-  tun: { part: "getan" },
-  können: { part: "gekonnt" },
-  müssen: { part: "gemusst" },
-  wollen: { part: "gewollt" },
-  sollen: { part: "gesollt" },
-  dürfen: { part: "gedurft" },
-  mögen: { part: "gemocht" },
-  gehen: { part: "gegangen", aux: "sein" },
-  kommen: { part: "gekommen", aux: "sein" },
-  fahren: { part: "gefahren", aux: "sein", du: "fährst", er: "fährt" },
-  essen: { part: "gegessen", du: "isst", er: "isst" },
-  lesen: { part: "gelesen", du: "liest", er: "liest" },
-  sehen: { part: "gesehen", du: "siehst", er: "sieht" },
-  sprechen: { part: "gesprochen", du: "sprichst", er: "spricht" },
-  nehmen: { part: "genommen", du: "nimmst", er: "nimmt" },
-  geben: { part: "gegeben", du: "gibst", er: "gibt" },
-  helfen: { part: "geholfen", du: "hilfst", er: "hilft" },
-  laufen: { part: "gelaufen", aux: "sein", du: "läufst", er: "läuft" },
-  schlafen: { part: "geschlafen", du: "schläfst", er: "schläft" },
-  tragen: { part: "getragen", du: "trägst", er: "trägt" },
-  waschen: { part: "gewaschen", du: "wäschst", er: "wäscht" },
-  fallen: { part: "gefallen", aux: "sein", du: "fällst", er: "fällt" },
-  halten: { part: "gehalten", du: "hältst", er: "hält" },
-  lassen: { part: "gelassen", du: "lässt", er: "lässt" },
-  fangen: { part: "gefangen", du: "fängst", er: "fängt" },
-  laden: { part: "geladen", du: "lädst", er: "lädt" },
-  treffen: { part: "getroffen", du: "triffst", er: "trifft" },
-  sterben: { part: "gestorben", aux: "sein", du: "stirbst", er: "stirbt" },
-  bleiben: { part: "geblieben", aux: "sein" },
-  schreiben: { part: "geschrieben" },
-  trinken: { part: "getrunken" },
-  finden: { part: "gefunden" },
-  singen: { part: "gesungen" },
-  schwimmen: { part: "geschwommen", aux: "sein" },
-  fliegen: { part: "geflogen", aux: "sein" },
-  ziehen: { part: "gezogen" },
-  steigen: { part: "gestiegen", aux: "sein" },
-  stehen: { part: "gestanden" },
-  sitzen: { part: "gesessen" },
-  liegen: { part: "gelegen" },
-  heißen: { part: "geheißen" },
-  rufen: { part: "gerufen" },
-  schließen: { part: "geschlossen" },
-  bringen: { part: "gebracht" },
-  denken: { part: "gedacht" },
-  kennen: { part: "gekannt" },
-  nennen: { part: "genannt" },
-  rennen: { part: "gerannt", aux: "sein" },
-  brennen: { part: "gebrannt" },
-  beginnen: { part: "begonnen" },
-  gewinnen: { part: "gewonnen" },
-  verlieren: { part: "verloren" },
-  vergessen: { part: "vergessen", du: "vergisst", er: "vergisst" },
-  verstehen: { part: "verstanden" },
-  empfehlen: { part: "empfohlen", du: "empfiehlst", er: "empfiehlt" },
-  gefallen: { part: "gefallen", du: "gefällst", er: "gefällt" },
-  bekommen: { part: "bekommen" },
-  bitten: { part: "gebeten" },
+  sein: { part: "gewesen", praet: "war", aux: "sein" },
+  haben: { part: "gehabt", praet: "hatte" },
+  werden: { part: "geworden", praet: "wurde", aux: "sein" },
+  wissen: { part: "gewusst", praet: "wusste" },
+  tun: { part: "getan", praet: "tat" },
+  können: { part: "gekonnt", praet: "konnte" },
+  müssen: { part: "gemusst", praet: "musste" },
+  wollen: { part: "gewollt", praet: "wollte" },
+  sollen: { part: "gesollt", praet: "sollte" },
+  dürfen: { part: "gedurft", praet: "durfte" },
+  mögen: { part: "gemocht", praet: "mochte" },
+  gehen: { part: "gegangen", praet: "ging", aux: "sein" },
+  kommen: { part: "gekommen", praet: "kam", aux: "sein" },
+  fahren: { part: "gefahren", praet: "fuhr", aux: "sein", du: "fährst", er: "fährt" },
+  essen: { part: "gegessen", praet: "aß", du: "isst", er: "isst" },
+  lesen: { part: "gelesen", praet: "las", du: "liest", er: "liest" },
+  sehen: { part: "gesehen", praet: "sah", du: "siehst", er: "sieht" },
+  sprechen: { part: "gesprochen", praet: "sprach", du: "sprichst", er: "spricht" },
+  nehmen: { part: "genommen", praet: "nahm", du: "nimmst", er: "nimmt" },
+  geben: { part: "gegeben", praet: "gab", du: "gibst", er: "gibt" },
+  helfen: { part: "geholfen", praet: "half", du: "hilfst", er: "hilft" },
+  laufen: { part: "gelaufen", praet: "lief", aux: "sein", du: "läufst", er: "läuft" },
+  schlafen: { part: "geschlafen", praet: "schlief", du: "schläfst", er: "schläft" },
+  tragen: { part: "getragen", praet: "trug", du: "trägst", er: "trägt" },
+  waschen: { part: "gewaschen", praet: "wusch", du: "wäschst", er: "wäscht" },
+  fallen: { part: "gefallen", praet: "fiel", aux: "sein", du: "fällst", er: "fällt" },
+  halten: { part: "gehalten", praet: "hielt", du: "hältst", er: "hält" },
+  lassen: { part: "gelassen", praet: "ließ", du: "lässt", er: "lässt" },
+  fangen: { part: "gefangen", praet: "fing", du: "fängst", er: "fängt" },
+  laden: { part: "geladen", praet: "lud", du: "lädst", er: "lädt" },
+  treffen: { part: "getroffen", praet: "traf", du: "triffst", er: "trifft" },
+  sterben: { part: "gestorben", praet: "starb", aux: "sein", du: "stirbst", er: "stirbt" },
+  bleiben: { part: "geblieben", praet: "blieb", aux: "sein" },
+  schreiben: { part: "geschrieben", praet: "schrieb" },
+  trinken: { part: "getrunken", praet: "trank" },
+  finden: { part: "gefunden", praet: "fand" },
+  singen: { part: "gesungen", praet: "sang" },
+  schwimmen: { part: "geschwommen", praet: "schwamm", aux: "sein" },
+  fliegen: { part: "geflogen", praet: "flog", aux: "sein" },
+  ziehen: { part: "gezogen", praet: "zog" },
+  steigen: { part: "gestiegen", praet: "stieg", aux: "sein" },
+  stehen: { part: "gestanden", praet: "stand" },
+  sitzen: { part: "gesessen", praet: "saß" },
+  liegen: { part: "gelegen", praet: "lag" },
+  heißen: { part: "geheißen", praet: "hieß" },
+  rufen: { part: "gerufen", praet: "rief" },
+  schließen: { part: "geschlossen", praet: "schloss" },
+  bringen: { part: "gebracht", praet: "brachte" },
+  denken: { part: "gedacht", praet: "dachte" },
+  kennen: { part: "gekannt", praet: "kannte" },
+  nennen: { part: "genannt", praet: "nannte" },
+  rennen: { part: "gerannt", praet: "rannte", aux: "sein" },
+  brennen: { part: "gebrannt", praet: "brannte" },
+  beginnen: { part: "begonnen", praet: "begann" },
+  gewinnen: { part: "gewonnen", praet: "gewann" },
+  verlieren: { part: "verloren", praet: "verlor" },
+  vergessen: { part: "vergessen", praet: "vergaß", du: "vergisst", er: "vergisst" },
+  verstehen: { part: "verstanden", praet: "verstand" },
+  empfehlen: { part: "empfohlen", praet: "empfahl", du: "empfiehlst", er: "empfiehlt" },
+  gefallen: { part: "gefallen", praet: "gefiel", du: "gefällst", er: "gefällt" },
+  bekommen: { part: "bekommen", praet: "bekam" },
+  bitten: { part: "gebeten", praet: "bat" },
 };
 
 /** Separable/derived verbs whose auxiliary differs from their base verb */
@@ -343,8 +349,8 @@ function conjugateBase(inf: string): PresentConjugation {
 
 const REFLEXIVE_PRONOUNS = { ich: "mich", du: "dich", er: "sich", wir: "uns", ihr: "euch", sie: "sich" } as const;
 
-function assemble(parsed: ParsedVerb): PresentConjugation {
-  const base = conjugateBase(parsed.base);
+/** Append reflexive pronoun and separable prefix to each base form */
+function assemble(parsed: ParsedVerb, base: PresentConjugation): PresentConjugation {
   const out = {} as PresentConjugation;
   (Object.keys(base) as (keyof PresentConjugation)[]).forEach((p) => {
     let form = base[p];
@@ -353,6 +359,44 @@ function assemble(parsed: ParsedVerb): PresentConjugation {
     out[p] = form;
   });
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Präteritum
+// ---------------------------------------------------------------------------
+
+/** Präteritum ich/er form for a bare infinitive (regular guess when unknown) */
+function praetStemOf(inf: string): string {
+  const strong = STRONG[inf];
+  if (strong) return strong.praet;
+  // inseparable prefix + strong base: erfahren → er + fuhr
+  for (const p of INSEPARABLE_PREFIXES) {
+    if (!inf.startsWith(p)) continue;
+    const rest = inf.slice(p.length);
+    if (rest.length >= 4 && STRONG[rest]) return p + STRONG[rest].praet;
+  }
+  const stem = stemOf(inf);
+  return stem + (needsE(stem) ? "ete" : "te");
+}
+
+function conjugatePraetBase(inf: string): PresentConjugation {
+  const stem = praetStemOf(inf);
+  if (stem.endsWith("e")) {
+    // weak & mixed stems: machte → machtest/machten, dachte → dachtest
+    return { ich: stem, du: `${stem}st`, er: stem, wir: `${stem}n`, ihr: `${stem}t`, sie: `${stem}n` };
+  }
+  // strong stems: ging → gingst/gingen; du inserts an e after t/d/sibilants
+  // (fandest, aßest) but ihr only after t/d (ihr fandet, yet ihr aßt)
+  const eDu = /[tdsßz]$/.test(stem) ? "e" : "";
+  const eIhr = /[td]$/.test(stem) ? "e" : "";
+  return {
+    ich: stem,
+    du: `${stem}${eDu}st`,
+    er: stem,
+    wir: `${stem}en`,
+    ihr: `${stem}${eIhr}t`,
+    sie: `${stem}en`,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -410,10 +454,13 @@ export function getVerbInfo(german: string): VerbInfo | null {
   types.push(irregular ? "Irregular" : "Regular");
 
   const extras = EXTRAS[full] ?? EXTRAS[parsed.base];
+  const praeteritum = assemble(parsed, conjugatePraetBase(parsed.base));
 
   return {
     infinitive: german.trim(),
-    present: assemble(parsed),
+    present: assemble(parsed, conjugateBase(parsed.base)),
+    praeteritum,
+    praeteritumEr: praeteritum.er,
     perfekt: `${aux === "sein" ? "ist" : "hat"}${parsed.reflexive ? " sich" : ""} ${participle}`,
     aux,
     types,

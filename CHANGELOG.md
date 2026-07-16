@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Präteritum (simple past) for verbs.** The verb engine now derives the full Präteritum table for every verb (curated stems for the ~60 strong/mixed/irregular verbs, regular `-te` rules with correct e-insertion otherwise, separable and reflexive verbs included). The word detail page shows the er/sie/es form in a reworked "Past forms" card next to the Perfekt, plus a collapsible "Conjugation (Präteritum)" table
+
+- **Adjective comparison.** Adjectives get a "Comparison" card (Positiv / Komparativ / Superlativ with a play button), driven by a new on-device engine: curated umlaut/irregular forms (gut/besser/am besten, hoch, nah, groß, alt, …) plus regular rules with elision (dunkel → dunkler, teuer → teurer) and superlative e-insertion (am lautesten)
+
+- **Example sentences for every word.** Enrichment now extracts a usage example (German + English) from Wiktionary when the entry has one, and a background backfill fills the rest via a new `/api/ai/examples` route (same Gemini→Groq chain as the scanner, batched 10 words per request). The backfill resumes automatically at startup, after sync pulls, and after adding words; it backs off on rate limits, gives up on a word after 3 failed attempts, skips sentence entries and verbs with curated examples, and caches AI sentences in the dictionary cache so re-adding a word is free
+
+### Fixed
+
+- **Looked-up examples are saved again.** Enrichment produced `example`/`exampleEn` but never wrote them to the word row; they now persist (without overwriting anything the user typed)
+
 - **Gemini is the primary AI for photo scans, with Groq as fallback.** Both AI routes now try Gemini first (default model `gemini-flash-lite-latest`) and fall back to Groq when Gemini fails or is unavailable; if both fail, the scan still degrades gracefully to on-device OCR and heuristics. The back office System settings page gains a second provider card (key, model id, Test connection, Remove); the Gemini key can come from the `GEMINI_API_KEY` env var, and a key saved in the back office overrides it without a redeploy. Responses carry a diagnostic `provider` field and Gemini failures are logged to the function logs
 
 - **Degraded scans are announced.** When the AI scanner is rate limited or unavailable and a photo scan falls back to basic on-device text recognition, the add-words sheet now says so instead of silently returning worse results

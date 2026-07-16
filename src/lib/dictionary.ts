@@ -242,6 +242,8 @@ function parseGermanWikitext(title: string, wikitext: string): DictEntry | null 
   const english = extractDefinitions(posBody);
   if (!english && !article) return null;
 
+  const { example, exampleEn } = extractExample(posBody);
+
   return {
     key: title.toLowerCase(),
     german: title,
@@ -250,6 +252,8 @@ function parseGermanWikitext(title: string, wikitext: string): DictEntry | null 
     plural,
     ipa,
     pos,
+    example,
+    exampleEn,
     fetchedAt: Date.now(),
   };
 }
@@ -273,6 +277,63 @@ function extractDefinitions(body: string): string {
     if (defs.length >= 2) break;
   }
   return defs.join("; ");
+}
+
+/** Strip wiki links (they contain pipes, so must go before any param split) */
+function stripWikiLinks(text: string): string {
+  return text.replace(/\[\[(?:[^\]|]*\|)?([^\]]+)\]\]/g, "$1");
+}
+
+function cleanExampleText(text: string): string {
+  return text
+    .replace(/\{\{[^}]*\}\}/g, "")
+    .replace(/'''?/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isUsableExample(german: string): boolean {
+  return german.length >= 8 && german.length <= 160 && german.includes(" ");
+}
+
+/**
+ * First usable usage example: {{ux|de|German|English}} templates (the
+ * translation can be the second positional param or t=/translation=),
+ * preferring full sentences over fragments, then "#:" italic lines.
+ */
+function extractExample(body: string): { example?: string; exampleEn?: string } {
+  const candidates: { example: string; exampleEn?: string }[] = [];
+  const tplRe = /\{\{(?:ux|uxi|usex)\|de\|([^{}]*(?:\{\{[^{}]*\}\}[^{}]*)*)\}\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = tplRe.exec(body)) && candidates.length < 5) {
+    const positional: string[] = [];
+    let english = "";
+    for (const part of stripWikiLinks(m[1]).split("|")) {
+      const eq = part.indexOf("=");
+      if (eq === -1) {
+        positional.push(cleanExampleText(part));
+        continue;
+      }
+      const key = part.slice(0, eq).trim();
+      if (key === "t" || key === "translation") english = cleanExampleText(part.slice(eq + 1));
+    }
+    const german = positional[0] ?? "";
+    if (!english) english = positional[1] ?? "";
+    if (isUsableExample(german)) {
+      candidates.push({ example: german, exampleEn: english ? english.slice(0, 200) : undefined });
+    }
+  }
+  const sentence = candidates.find((c) => /[.!?]$/.test(c.example));
+  if (sentence) return sentence;
+  if (candidates[0]) return candidates[0];
+
+  // plain italic example lines: "#: ''Der Hund bellt.''" (German only)
+  const line = body.match(/^#+:\s*''(.+?)''/m);
+  if (line) {
+    const german = cleanExampleText(stripWikiLinks(line[1]));
+    if (isUsableExample(german)) return { example: german };
+  }
+  return {};
 }
 
 /** Best-effort parse of {{de-noun|...}} template params for gender and plural */
