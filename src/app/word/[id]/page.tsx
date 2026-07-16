@@ -226,8 +226,10 @@ export default function WordDetailPage({
         </div>
       </div>
 
-      {/* Example (verbs show it in the verb section instead) */}
-      {word.pos !== "verb" && <ExampleCard example={word.example} exampleEn={word.exampleEn} />}
+      {/* Example (verbs and adjectives show it in their own sections instead) */}
+      {word.pos !== "verb" && word.pos !== "adjective" && (
+        <ExampleCard example={word.example} exampleEn={word.exampleEn} />
+      )}
 
       {/* Notes */}
       {word.notes && (

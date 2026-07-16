@@ -3,6 +3,7 @@
 import { db } from "./db";
 import { AI_EXAMPLE_BATCH, generateExamplesWithAi } from "./ai";
 import { isSentence } from "./scan-rules";
+import { getAdjectiveInfo } from "./adjectives";
 import { getVerbInfo } from "./verbs";
 import type { Word } from "./types";
 
@@ -64,8 +65,9 @@ function needsExample(w: Word, attempts: Record<string, number>): boolean {
   if (w.status !== "ready" || w.example || w.id == null) return false;
   // sentence entries from scans are their own example
   if (isSentence(w.german)) return false;
-  // curated verb examples already render in the verb section
+  // curated verb/adjective examples already render in their sections
   if (w.pos === "verb" && getVerbInfo(w.german)?.example) return false;
+  if (w.pos === "adjective" && getAdjectiveInfo(w.german)?.example) return false;
   return (attempts[w.german.toLowerCase()] ?? 0) < MAX_ATTEMPTS;
 }
 
