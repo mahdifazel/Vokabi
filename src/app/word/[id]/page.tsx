@@ -20,6 +20,7 @@ import { speak } from "@/lib/tts";
 import { getSettings } from "@/lib/settings";
 import { PracticeSheet } from "@/components/practice-sheet";
 import { AdjectiveDetails } from "@/components/adjective-details";
+import { NounDetails } from "@/components/noun-details";
 import { VerbDetails } from "@/components/verb-details";
 import { Button, Card, Input, Sheet, Textarea, cn } from "@/components/ui";
 
@@ -230,6 +231,9 @@ export default function WordDetailPage({
 
       {/* Adjective details: comparison forms */}
       {word.pos === "adjective" && <AdjectiveDetails word={word} />}
+
+      {/* Noun details: declension + gender hint */}
+      {word.pos === "noun" && <NounDetails word={word} />}
 
       {/* Delete */}
       {!confirmDelete ? (
