@@ -79,7 +79,7 @@ export function VerbDetails({ word }: { word: Word }) {
       </Card>
 
       {/* Present tense conjugation */}
-      <Collapsible title="Conjugation (Präsens)" className="mb-3">
+      <Collapsible title="Conjugation (Präsens)" className="mb-3" defaultOpen>
         <div className="flex flex-col">
           {PRONOUNS.map(([key, label], i) => (
             <div
@@ -98,7 +98,7 @@ export function VerbDetails({ word }: { word: Word }) {
 
       {/* Grammar details */}
       {grammar.length > 0 && (
-        <Collapsible title="Grammar" className="mb-3">
+        <Collapsible title="Grammar" className="mb-3" defaultOpen>
           <div className="flex flex-col">
             {grammar.map(([label, value], i) => (
               <div

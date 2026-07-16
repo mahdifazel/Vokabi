@@ -260,12 +260,14 @@ export function Collapsible({
   title,
   children,
   className,
+  defaultOpen = false,
 }: {
   title: string;
   children: ReactNode;
   className?: string;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <Card className={cn("overflow-hidden", className)}>
       <button
