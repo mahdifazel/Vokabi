@@ -9,6 +9,7 @@
   --foreground: #1e2235;
   --muted: #6b7089;
   --border: #e3e6f2;
+  --border-strong: #c9cee4;
   --primary: #4f46e5;
   --primary-soft: #eef0fe;
   --on-primary: #ffffff;
@@ -25,6 +26,7 @@
   --foreground: #e8eaf5;
   --muted: #9aa0b8;
   --border: #272d42;
+  --border-strong: #3f4664;
   --primary: #818cf8;
   --primary-soft: #23264a;
   --on-primary: #0c0f1a;
@@ -41,6 +43,7 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-primary: var(--primary);
   --color-primary-soft: var(--primary-soft);
   --color-on-primary: var(--on-primary);
