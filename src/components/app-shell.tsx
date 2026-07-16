@@ -10,7 +10,7 @@ import { applyTheme, getSettings } from "@/lib/settings";
 import { initAuth, useAuthReady, useUser } from "@/lib/auth";
 import { cloudConfigured } from "@/lib/supabase";
 import { initSync, syncNow } from "@/lib/sync";
-import { ensureWordsGrouped, resumePendingEnrichment } from "@/lib/words";
+import { backfillMissingWordFields, ensureWordsGrouped, resumePendingEnrichment } from "@/lib/words";
 import { scheduleExampleBackfill } from "@/lib/examples";
 import { MiniPlayer } from "./mini-player";
 import { Splash } from "./splash";
@@ -83,6 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!cloudConfigured()) {
       void ensureWordsGrouped();
       void resumePendingEnrichment();
+      void backfillMissingWordFields();
       scheduleExampleBackfill();
     }
     // keep "system" theme in sync when OS theme changes

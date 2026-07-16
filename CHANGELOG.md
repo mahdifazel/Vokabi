@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Old words missing their details heal themselves.** Words saved as "ready" but without a part of speech or translation (from before these fields were reliably enriched) never fixed themselves, because adding an existing word to another group only merges group membership without re-enriching; a verb like "machen" therefore never showed its conjugation. A background pass now re-looks-up such words and fills in only the missing fields (pos, translation, article, plural, IPA, example), never touching anything already there, and fixes pure casing leftovers ("Machen" becomes "machen" when identified as a verb). It runs at startup, after sync pulls, and immediately when an add merges into an incomplete word
+
 - **Capitalized verbs are no longer misclassified as nouns.** German turns every infinitive into a gerund noun (das Schwimmen), and phone keyboards auto-capitalize the first letter, so "Schwimmen" used to match the noun page on Wiktionary and lose its verb details. Lookups now try the lowercase page first unless the user typed an article (which signals they want the noun); real nouns are unaffected because their lowercase pages have no German entry. The edit sheet also gains a "Part of speech" selector so any already-saved misclassification can be corrected by hand
 
 - **Looked-up examples are saved again.** Enrichment produced `example`/`exampleEn` but never wrote them to the word row; they now persist (without overwriting anything the user typed)

@@ -5,7 +5,12 @@ import { db, onLocalMutation, withRemoteWrites } from "./db";
 import { getSupabase } from "./supabase";
 import { getUser } from "./auth";
 // circular with words.ts (it imports scheduleSync); safe, both only call at runtime
-import { ensureWordsGrouped, resumePendingEnrichment, seedDefaultPresetGroups } from "./words";
+import {
+  backfillMissingWordFields,
+  ensureWordsGrouped,
+  resumePendingEnrichment,
+  seedDefaultPresetGroups,
+} from "./words";
 import { scheduleExampleBackfill } from "./examples";
 import type { Article, PartOfSpeech, Word, WordStatus } from "./types";
 
@@ -234,6 +239,10 @@ export async function syncNow(): Promise<void> {
     // this device, or rows that arrived pending from another device).
     // Fire-and-forget: enriching a big group can take minutes
     void resumePendingEnrichment();
+
+    // heal "ready" words missing pos/translation from before these fields
+    // were reliably enriched, so old verbs get their details too
+    void backfillMissingWordFields();
 
     // fill in example sentences for words that still lack one (delayed +
     // batched; a no-op when everything has an example already)

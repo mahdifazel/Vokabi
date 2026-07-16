@@ -28,6 +28,7 @@ export async function addWordsFromText(text: string, groupIds: number[] = []): P
   const now = Date.now();
   const fresh: { input: ParsedInput; word: Word }[] = [];
   const ids: number[] = [];
+  let mergedIncomplete = false;
 
   for (const input of inputs) {
     const existing = await db.words
@@ -40,6 +41,7 @@ export async function addWordsFromText(text: string, groupIds: number[] = []): P
       if (merged.length !== existing.groupIds.length) {
         await db.words.update(existing.id, { groupIds: merged, updatedAt: now });
       }
+      if (isIncomplete(existing)) mergedIncomplete = true;
       ids.push(existing.id);
       continue;
     }
@@ -59,6 +61,8 @@ export async function addWordsFromText(text: string, groupIds: number[] = []): P
 
   // Enrich in background (bounded concurrency to be polite to the APIs)
   void enrichWords(fresh);
+  // heal existing rows the add merged into (e.g. an old verb without pos)
+  if (mergedIncomplete) void backfillMissingWordFields();
   return ids;
 }
 
@@ -120,6 +124,69 @@ export async function resumePendingEnrichment() {
     .filter((w) => w.id != null && !inFlightEnrichment.has(w.id))
     .map((w) => ({ input: { german: w.german, articleHint: w.article }, word: w }));
   if (items.length > 0) await enrichWords(items);
+}
+
+/** Word rows that are "ready" but lack the fields the detail sections need */
+function isIncomplete(w: Word): boolean {
+  return w.status === "ready" && (!w.pos || !w.english);
+}
+
+/**
+ * Old rows can be "ready" yet incomplete: earlier app versions dropped some
+ * fields, and re-adding an existing word only merges group membership without
+ * re-enriching, so gaps never healed (a verb without pos shows no conjugation
+ * section). Look those words up again and fill in ONLY what is missing; never
+ * overwrite a field the user already has. Runs at startup, after sync pulls,
+ * and when an add merges into an incomplete existing word.
+ */
+let fieldBackfillRunning = false;
+export async function backfillMissingWordFields() {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return;
+  if (fieldBackfillRunning) return;
+  fieldBackfillRunning = true;
+  try {
+    const rows = (await db.words.filter(isIncomplete).toArray()).filter(
+      (w) => w.id != null && !inFlightEnrichment.has(w.id)
+    );
+    const CONCURRENCY = 3;
+    let i = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, rows.length) }, async () => {
+        while (i < rows.length) {
+          const w = rows[i++];
+          try {
+            const entry = await lookupWord({ german: w.german, articleHint: w.article });
+            if (!entry) continue;
+            const updates: Partial<Word> = {};
+            if (!w.pos && entry.pos) updates.pos = entry.pos;
+            if (!w.english && entry.english) updates.english = entry.english;
+            if (!w.article && entry.article) updates.article = entry.article;
+            if (!w.plural && entry.plural) updates.plural = entry.plural;
+            if (!w.ipa && entry.ipa) updates.ipa = entry.ipa;
+            if (!w.example && entry.example) {
+              updates.example = entry.example;
+              if (entry.exampleEn) updates.exampleEn = entry.exampleEn;
+            }
+            // a verb saved noun-cased ("Machen") gets its casing fixed along
+            // with the newly found pos; only ever a pure case difference
+            if (
+              updates.pos &&
+              updates.pos !== "noun" &&
+              entry.german !== w.german &&
+              entry.german.toLowerCase() === w.german.toLowerCase()
+            ) {
+              updates.german = entry.german;
+            }
+            if (Object.keys(updates).length > 0) await db.words.update(w.id!, updates);
+          } catch {
+            // one bad lookup must not stop the pass
+          }
+        }
+      })
+    );
+  } finally {
+    fieldBackfillRunning = false;
+  }
 }
 
 /**
