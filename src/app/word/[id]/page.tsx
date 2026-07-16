@@ -13,7 +13,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { ARTICLE_BG, type Article } from "@/lib/types";
+import { ARTICLE_BG, type Article, type PartOfSpeech } from "@/lib/types";
 import { deleteWord, ensureWordsGrouped, toggleFavorite } from "@/lib/words";
 import { playWordOnce, wordSpokenText } from "@/lib/player";
 import { speak } from "@/lib/tts";
@@ -25,6 +25,21 @@ import { VerbDetails } from "@/components/verb-details";
 import { Button, Card, Input, Sheet, Textarea, cn } from "@/components/ui";
 
 const ARTICLES: (Article | "")[] = ["", "der", "die", "das"];
+
+const POS_OPTIONS: (PartOfSpeech | "")[] = [
+  "",
+  "noun",
+  "verb",
+  "adjective",
+  "adverb",
+  "pronoun",
+  "preposition",
+  "conjunction",
+  "interjection",
+  "numeral",
+  "phrase",
+  "other",
+];
 
 export default function WordDetailPage({
   params,
@@ -44,6 +59,7 @@ export default function WordDetailPage({
   const [draft, setDraft] = useState({
     german: "",
     article: "" as Article | "",
+    pos: "" as PartOfSpeech | "",
     english: "",
     plural: "",
     example: "",
@@ -69,6 +85,7 @@ export default function WordDetailPage({
     setDraft({
       german: word.german,
       article: word.article ?? "",
+      pos: word.pos ?? "",
       english: word.english ?? "",
       plural: word.plural ?? "",
       example: word.example ?? "",
@@ -84,6 +101,7 @@ export default function WordDetailPage({
     await db.words.update(wordId, {
       german: draft.german.trim(),
       article: draft.article || undefined,
+      pos: draft.pos || undefined,
       english: draft.english.trim() || undefined,
       plural: draft.plural.trim() || undefined,
       example: draft.example.trim() || undefined,
@@ -296,6 +314,24 @@ export default function WordDetailPage({
                   )}
                 >
                   {a || "none"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-extrabold">Part of speech</p>
+            <div className="flex flex-wrap gap-2">
+              {POS_OPTIONS.map((p) => (
+                <button
+                  key={p || "none"}
+                  onClick={() => setDraft({ ...draft, pos: p })}
+                  aria-pressed={draft.pos === p}
+                  className={cn(
+                    "cursor-pointer rounded-full px-3 py-1.5 text-sm font-bold transition-all active:scale-95",
+                    draft.pos === p ? "bg-primary text-on-primary" : "bg-surface-2 text-muted"
+                  )}
+                >
+                  {p || "none"}
                 </button>
               ))}
             </div>

@@ -87,7 +87,7 @@ export async function lookupWord(input: ParsedInput): Promise<DictEntry | null> 
 
   if (!isOnline()) return cachedEntry && !cachedEntry.miss ? cachedEntry : null;
 
-  let entry = await fetchFromWiktionary(input.german);
+  let entry = await fetchFromWiktionary(input.german, !!input.articleHint);
 
   if (!entry) {
     const translation = await fetchTranslation(input.german);
@@ -169,12 +169,18 @@ const GENDER_TO_ARTICLE: Record<string, Article> = {
   n: "das",
 };
 
-async function fetchFromWiktionary(word: string): Promise<DictEntry | null> {
-  const candidates = [...new Set([
-    word,
-    word[0].toUpperCase() + word.slice(1),
-    word.toLowerCase(),
-  ])];
+async function fetchFromWiktionary(word: string, nounFirst: boolean): Promise<DictEntry | null> {
+  const capitalized = word[0].toUpperCase() + word.slice(1);
+  const lower = word.toLowerCase();
+  // German capitalizes every verb's gerund into a real noun (das Schwimmen),
+  // and mobile keyboards auto-capitalize the first letter, so trying the word
+  // as typed first misclassifies capitalized verbs as nouns. Without an
+  // article hint the lowercase page (verbs, adjectives, adverbs) gets
+  // priority; real nouns fall through safely because their lowercase pages
+  // have no German section. A typed article means the user wants the noun.
+  const candidates = [
+    ...new Set(nounFirst ? [capitalized, word, lower] : [lower, word, capitalized]),
+  ];
   for (const title of candidates) {
     try {
       const res = await fetch(

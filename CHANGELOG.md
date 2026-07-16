@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Capitalized verbs are no longer misclassified as nouns.** German turns every infinitive into a gerund noun (das Schwimmen), and phone keyboards auto-capitalize the first letter, so "Schwimmen" used to match the noun page on Wiktionary and lose its verb details. Lookups now try the lowercase page first unless the user typed an article (which signals they want the noun); real nouns are unaffected because their lowercase pages have no German entry. The edit sheet also gains a "Part of speech" selector so any already-saved misclassification can be corrected by hand
+
 - **Looked-up examples are saved again.** Enrichment produced `example`/`exampleEn` but never wrote them to the word row; they now persist (without overwriting anything the user typed)
 
 - **Gemini is the primary AI for photo scans, with Groq as fallback.** Both AI routes now try Gemini first (default model `gemini-flash-lite-latest`) and fall back to Groq when Gemini fails or is unavailable; if both fail, the scan still degrades gracefully to on-device OCR and heuristics. The back office System settings page gains a second provider card (key, model id, Test connection, Remove); the Gemini key can come from the `GEMINI_API_KEY` env var, and a key saved in the back office overrides it without a redeploy. Responses carry a diagnostic `provider` field and Gemini failures are logged to the function logs
