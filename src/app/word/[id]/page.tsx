@@ -20,6 +20,7 @@ import { speak } from "@/lib/tts";
 import { getSettings } from "@/lib/settings";
 import { PracticeSheet } from "@/components/practice-sheet";
 import { AdjectiveDetails } from "@/components/adjective-details";
+import { ExampleCard } from "@/components/example-card";
 import { NounDetails } from "@/components/noun-details";
 import { VerbDetails } from "@/components/verb-details";
 import { Button, Card, Input, Sheet, Textarea, cn } from "@/components/ui";
@@ -226,15 +227,7 @@ export default function WordDetailPage({
       </div>
 
       {/* Example (verbs show it in the verb section instead) */}
-      {word.pos !== "verb" && (word.example || word.exampleEn) && (
-        <Card className="mb-3 p-4">
-          <p className="mb-1 text-xs font-extrabold tracking-wide text-muted uppercase">
-            Example
-          </p>
-          {word.example && <p className="font-bold">{word.example}</p>}
-          {word.exampleEn && <p className="text-sm font-semibold text-muted">{word.exampleEn}</p>}
-        </Card>
-      )}
+      {word.pos !== "verb" && <ExampleCard example={word.example} exampleEn={word.exampleEn} />}
 
       {/* Notes */}
       {word.notes && (

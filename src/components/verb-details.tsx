@@ -7,6 +7,7 @@ import { getVerbInfo } from "@/lib/verbs";
 import { speak } from "@/lib/tts";
 import { getSettings } from "@/lib/settings";
 import { Card, Collapsible } from "./ui";
+import { ExampleCard } from "./example-card";
 
 const PRONOUNS = [
   ["ich", "ich"],
@@ -39,24 +40,7 @@ export function VerbDetails({ word }: { word: Word }) {
   return (
     <>
       {/* Example sentence */}
-      {example && (
-        <Card className="mb-3 p-4">
-          <p className="mb-1 text-xs font-extrabold tracking-wide text-muted uppercase">Example</p>
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="font-bold" lang="de">{example}</p>
-              {exampleEn && <p className="mt-0.5 text-sm font-semibold text-muted">{exampleEn}</p>}
-            </div>
-            <button
-              onClick={() => speakGerman(example)}
-              aria-label="Play example sentence"
-              className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary-soft text-primary active:scale-90"
-            >
-              <Volume2 size={18} />
-            </button>
-          </div>
-        </Card>
-      )}
+      <ExampleCard example={example} exampleEn={exampleEn} />
 
       {/* Past forms (Präteritum + Perfekt) */}
       <Card className="mb-3 p-4">

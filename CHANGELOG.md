@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **All words share the verb section's example card.** Nouns, adjectives and other words now show their example sentence in the same card as verbs: German text marked for correct TTS, English translation below, and a play button to hear the sentence (previously non-verbs got a plain card without playback)
+
 - **The add-words group picker is a single scrollable row.** The "Add to groups" chips no longer wrap into a tall block: they sit in one horizontal row that scrolls sideways without a visible scrollbar, selected groups always sort to the front, and selecting a chip scrolls the row back to the start so the selection stays visible
 
 - **The photo scan's Groq vision model default is `qwen/qwen3.6-27b`** (Groq deprecated Llama 4 Scout for 2026-07-17), with thinking disabled so reasoning tokens don't truncate the answer
