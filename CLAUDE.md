@@ -6,7 +6,7 @@ Guidance for AI assistants and new developers working in this repository.
 
 ## Project overview
 
-**Vokabi** is a mobile-first Progressive Web App for learning German vocabulary, live at **https://vokabi.app**. Users paste words (single or bulk) or scan them from a photo (Gemini reads the photo when configured, a Groq vision model is the fallback; on-device OCR plus AI text cleanup as the last resort), the app enriches them automatically with article (der/die/das), English translation, plural, IPA, and part of speech, then trains them through native TTS playback (with lock-screen media controls that keep playing while the screen is off), pronunciation practice via speech recognition, flashcards, and quizzes. Verbs additionally get an on-device conjugation/Perfekt/grammar breakdown (`lib/verbs.ts`). Data is offline-first (IndexedDB) and syncs per-user to Supabase. An admin back office lives at `/admin`; among other things it curates **preset groups** (ready-made word lists) that users can add from the app's "New group" flow. Presets flagged as **default** are seeded into every signed-in user's library automatically after a sync pull, and removed again when the admin unflags or deletes the preset (`seedDefaultPresetGroups` in `lib/words.ts`; a per-account localStorage record maps preset ids to the created group uids, so removal only ever touches groups the seeding created, and a user-deleted default group stays deleted on that device).
+**Vokabi** is a mobile-first Progressive Web App for learning German vocabulary, live at **https://vokabi.app**. Users paste words (single or bulk) or scan them from a photo (Gemini reads the photo when configured, a Groq vision model is the fallback; on-device OCR plus AI text cleanup as the last resort), the app enriches them automatically with article (der/die/das), English translation, plural, IPA, part of speech, and an example sentence (Wiktionary first, AI-generated fallback), then trains them through native TTS playback (with lock-screen media controls that keep playing while the screen is off), pronunciation practice via speech recognition, flashcards, and quizzes. Verbs, adjectives, and nouns additionally get on-device detail sections: conjugation incl. Präteritum and Perfekt (`lib/verbs.ts`), comparison plus opposites/levels/common combinations (`lib/adjectives.ts`), and four-case declension plus gender-rule hints (`lib/nouns.ts`). Data is offline-first (IndexedDB) and syncs per-user to Supabase. An admin back office lives at `/admin`; among other things it curates **preset groups** (ready-made word lists) that users can add from the app's "New group" flow. Presets flagged as **default** are seeded into every signed-in user's library automatically after a sync pull, and removed again when the admin unflags or deletes the preset (`seedDefaultPresetGroups` in `lib/words.ts`; a per-account localStorage record maps preset ids to the created group uids, so removal only ever touches groups the seeding created, and a user-deleted default group stays deleted on that device).
 
 ## Tech stack
 
@@ -60,7 +60,7 @@ Database schema is applied **manually** in the Supabase SQL Editor: run `supabas
 
 ## Architecture in one paragraph
 
-The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing → MyMemory translation fallback; enrichment left unfinished ("pending" words) resumes automatically at startup and after sync pulls. Photo scanning is vision-first: the photo is downscaled once (`src/lib/image.ts`) and sent as a JPEG to `/api/ai/extract-words-image`, which tries Gemini first and a Groq vision model as fallback; on any failure the client fallback chain runs — Tesseract.js on-device OCR (`src/lib/ocr.ts`, assets self-hosted under `/ocr/`), then `/api/ai/extract-words` for AI text cleanup (same Gemini→Groq chain), then the heuristic line filter (`src/lib/ai.ts` returns null on failure and "rate-limited" on a 429 at each AI step; an empty array is a real "no vocabulary" answer, and the add-words sheet shows a notice whenever a scan fell back). Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist) and `/api/ai/*` (signed-in users; calls Gemini then Groq with keys stored in `app_settings` — the Gemini key alternatively from the `GEMINI_API_KEY` env var — and the client falls back to on-device processing when both fail). Preset groups are the one admin-curated table users read directly: `lib/presets.ts` queries `preset_groups` via the Supabase client (RLS allows select to authenticated users), and adding one materializes a normal local group + words through the standard pipeline. See `docs/ARCHITECTURE.md` for the full picture.
+The app is almost entirely client-side. Dexie (IndexedDB) is the source of truth; every page reads it reactively via `useLiveQuery`. A sync engine (`src/lib/sync.ts`) pushes dirty rows / tombstoned deletions to Supabase and pulls everything back with last-write-wins merging, keyed by UUIDs (`uid`) since local numeric ids differ per device. Dictionary enrichment (`src/lib/dictionary.ts`) resolves words through: bundled seed dictionary → IndexedDB cache → en.wiktionary.org wikitext parsing (incl. usage examples; Wiktionary pages are tried lowercase-first unless the user typed an article, so auto-capitalized verbs don't match their gerund noun pages) → MyMemory translation fallback; enrichment left unfinished ("pending" words) resumes automatically at startup and after sync pulls, a self-heal pass (`backfillMissingWordFields` in `lib/words.ts`) fills missing pos/translation on old "ready" rows without overwriting user data, and a resumable backfill (`lib/examples.ts`) gives every word an example sentence via the dictionary cache or `/api/ai/examples` (batched, rate-limit-aware). Photo scanning is vision-first: the photo is downscaled once (`src/lib/image.ts`) and sent as a JPEG to `/api/ai/extract-words-image`, which tries Gemini first and a Groq vision model as fallback; on any failure the client fallback chain runs — Tesseract.js on-device OCR (`src/lib/ocr.ts`, assets self-hosted under `/ocr/`), then `/api/ai/extract-words` for AI text cleanup (same Gemini→Groq chain), then the heuristic line filter (`src/lib/ai.ts` returns null on failure and "rate-limited" on a 429 at each AI step; an empty array is a real "no vocabulary" answer, and the add-words sheet shows a notice whenever a scan fell back). Audio (`src/lib/tts.ts`, `player.ts`, `keepalive.ts`) drives the Web Speech API with Android-specific workarounds, a settings-aware playlist loop, a near-silent audio keep-alive for screen-off playback, and Media Session lock-screen controls. The only server code is `/api/admin/*` route handlers guarded by `requireAdmin` (bearer token verified via service-role client + `ADMIN_EMAILS` allowlist) and `/api/ai/*` (signed-in users; calls Gemini then Groq with keys stored in `app_settings` — the Gemini key alternatively from the `GEMINI_API_KEY` env var — and the client falls back to on-device processing when both fail). Preset groups are the one admin-curated table users read directly: `lib/presets.ts` queries `preset_groups` via the Supabase client (RLS allows select to authenticated users), and adding one materializes a normal local group + words through the standard pipeline. See `docs/ARCHITECTURE.md` for the full picture.
 
 ## Directory structure
 
@@ -78,7 +78,7 @@ src/
     settings/              Audio/theme/data/account/feedback
     admin/                 Back office UI (own layout + guard)
     api/admin/             Server route handlers (service-role)
-    api/ai/                AI routes for signed-in users (word extraction, Gemini→Groq)
+    api/ai/                AI routes for signed-in users (word extraction + example generation, Gemini→Groq)
     layout.tsx             Root layout: fonts, theme script, AppShell
     globals.css            Tailwind v4 theme tokens (light + .dark)
     icon.svg               Favicon (Next.js file convention)
@@ -87,12 +87,14 @@ src/
     ui.tsx                 Primitives: Button, Card, Input, Switch, Segmented, Sheet, Collapsible…
     interactive-menu.tsx   Animated bottom nav (icon bounce, label slides in beside it)
     new-group-sheet.tsx    "New group" flow: custom name or searchable preset browser
-    …                      Feature components (word-row, add-words-sheet, mini-player, verb-details, splash, …)
+    …                      Feature components (word-row, add-words-sheet, mini-player, splash,
+                           verb-/adjective-/noun-details, example-card, …)
   lib/
     types.ts               All shared types + article color maps
     db.ts                  Dexie schema v2, mutation hooks (uid/dirty), remote-write guard
-    words.ts               Word CRUD, bulk add + enrichment (auto-resumed when interrupted), group-aware import/export, default preset seeding, search
-    dictionary.ts          Lookup pipeline + Wiktionary wikitext parser
+    words.ts               Word CRUD, bulk add + enrichment (auto-resumed when interrupted), missing-field self-heal, group-aware import/export, default preset seeding, search
+    dictionary.ts          Lookup pipeline + Wiktionary wikitext parser (defs, noun template, usage examples)
+    examples.ts            Resumable example-sentence backfill (dictCache first, then /api/ai/examples)
     seed-dictionary.ts     ~300 common A1/A2 words bundled for offline
     sync.ts                Push/pull/merge engine + default-group seeding
     presets.ts             Fetch admin-curated preset groups (null when unconfigured)
@@ -106,7 +108,9 @@ src/
     keepalive.ts           Silent-audio loop for background playback
     diag.ts                Playback event log (hidden UI: 7 taps on Settings footer)
     learn.ts               Learn sources + quiz question builder
-    verbs.ts               Verb engine: present conjugation, Perfekt + sein/haben, grammar data
+    verbs.ts               Verb engine: Präsens + Präteritum conjugation, Perfekt + sein/haben, grammar data
+    adjectives.ts          Adjective engine: comparison + curated opposites/levels/combinations
+    nouns.ts               Noun engine: four-case declension, weak n-nouns, gender-rule hints
     settings.ts            localStorage settings store + theme application
     admin/server.ts        requireAdmin + service client (server only)
     admin/client.ts        adminFetch + admin row types
