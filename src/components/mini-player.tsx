@@ -27,7 +27,7 @@ export function MiniPlayer() {
           transition={{ type: "spring", damping: 28, stiffness: 320 }}
           className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 mx-auto max-w-lg"
         >
-          <div className="relative rounded-3xl border border-border-strong bg-surface px-5 pb-8 pt-10 shadow-xl">
+          <div className="shine-stroke relative rounded-3xl border border-border-strong bg-surface px-5 pb-8 pt-10 shadow-xl">
             <button
               onClick={stopPlayer}
               aria-label="Stop playback"

@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The player card has a shining stroke.** A bright 1px glint (primary color with a lighter core) continuously sweeps around the playback card's border via an animated conic gradient (`.shine-stroke` in `globals.css`), making the active player stand out; the static strong outline stays underneath as a fallback
+
 - **The player card has a visible outline.** The expanded playback card now uses a new stronger border token (`--border-strong`, defined for light and dark) so its edge reads clearly against the page in both themes; the subtle `--border` token stays unchanged for row dividers
 
 - **All words share the verb section's example card.** Nouns, adjectives and other words now show their example sentence in the same card as verbs: German text marked for correct TTS, English translation below, and a play button to hear the sentence (previously non-verbs got a plain card without playback)
