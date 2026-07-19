@@ -132,6 +132,8 @@ startPlaylist(words, title)
 
 `tts.ts` hardens `speechSynthesis` for Android Chrome: resume-before-speak, a watchdog that re-queues silently dropped utterances once, and a hard timeout so a lost `onend` can't hang the playlist.
 
+The on-screen player card (`components/mini-player.tsx`) is marked with the `.shine-stroke` utility (defined in `globals.css`): a masked, animated conic gradient draws a 1px primary-colored glint that sweeps slowly around the card's border on top of its static outline, so the active player is easy to spot in both themes.
+
 ### 4. Auth gating (components/app-shell.tsx)
 
 - `cloudConfigured()` false → no gate, local-only mode (dev convenience)

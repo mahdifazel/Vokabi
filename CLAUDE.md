@@ -130,7 +130,7 @@ docs/                       Architecture, decisions, deployment, testing
 
 - **State stores**: module-level state + `useSyncExternalStore` (see `settings.ts`, `player.ts`, `auth.ts`, `sync.ts`). No Redux/Zustand.
 - **DB access**: components read via `useLiveQuery`; writes go through helpers in `words.ts` where side effects (outbox tombstones, sync scheduling) matter. Never mark rows dirty when applying remote data — wrap in `withRemoteWrites()`.
-- **Styling**: Tailwind utility classes referencing semantic tokens (`bg-surface`, `text-muted`, `bg-primary-soft`…) defined in `globals.css`. Dark mode = `.dark` class on `<html>` (set by inline script pre-hydration + `settings.ts`); **dark is the default** for users without saved settings. Never hardcode hex in components.
+- **Styling**: Tailwind utility classes referencing semantic tokens (`bg-surface`, `text-muted`, `bg-primary-soft`…) defined in `globals.css`. Dark mode = `.dark` class on `<html>` (set by inline script pre-hydration + `settings.ts`); **dark is the default** for users without saved settings. Never hardcode hex in components. Reusable CSS effects also live in `globals.css` (e.g. `.shine-stroke`, the slow animated 1px border glint on the mini player card).
 - **Client vs server**: everything under `src/app` (except `api/`) is client components (`"use client"`). Only `api/admin/*`, `api/ai/*` and `lib/admin/server.ts` run on the server.
 - **ESLint is strict about React**: no synchronous `setState` in effect bodies (use timers/microtasks or restructure), no ref reads during render. `npm run lint` must be clean before committing.
 - **Copy style**: user-facing text is friendly, concise, sentence case ("Add your first words", "Got it").
