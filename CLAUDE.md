@@ -91,7 +91,7 @@ src/
                            select all, exits via Esc / back button / deselect)
     merge-group-sheet.tsx  Pick a target group: source group's words move there, source is deleted
     use-long-press.ts      Shared long-press hook (word rows; group cards on the Library page
-                           open a delete/merge action sheet)
+                           open a rename/merge/delete action sheet)
     …                      Feature components (word-row, add-words-sheet, mini-player, splash,
                            verb-/adjective-/noun-details, example-card, …)
   lib/

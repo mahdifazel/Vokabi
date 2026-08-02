@@ -11,6 +11,7 @@ import {
   FolderOpen,
   FolderPlus,
   Heart,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -83,6 +84,8 @@ export default function LibraryPage() {
   const [actionGroup, setActionGroup] = useState<Group | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [newName, setNewName] = useState("");
 
   const words = useLiveQuery(() => db.words.orderBy("createdAt").reverse().toArray(), []);
   const groups = useLiveQuery(() => db.groups.orderBy("name").toArray(), []);
@@ -104,6 +107,14 @@ export default function LibraryPage() {
     else await deleteGroupAndDetachWords(actionGroup.id);
     setActionGroup(null);
     setConfirmDelete(false);
+  }
+
+  async function renameActionGroup() {
+    const trimmed = newName.trim();
+    if (actionGroup?.id == null || !trimmed) return;
+    await db.groups.update(actionGroup.id, { name: trimmed });
+    setRenameOpen(false);
+    setActionGroup(null);
   }
 
   const searching = query.trim().length > 0;
@@ -244,7 +255,7 @@ export default function LibraryPage() {
 
       {/* long-press group actions */}
       <Sheet
-        open={actionGroup !== null && !mergeOpen}
+        open={actionGroup !== null && !mergeOpen && !renameOpen}
         onClose={() => {
           setActionGroup(null);
           setConfirmDelete(false);
@@ -252,6 +263,16 @@ export default function LibraryPage() {
         title={actionGroup?.name ?? "Group"}
       >
         <div className="flex flex-col gap-2 pb-2">
+          <Button
+            variant="secondary"
+            className="w-full justify-start"
+            onClick={() => {
+              setNewName(actionGroup?.name ?? "");
+              setRenameOpen(true);
+            }}
+          >
+            <Pencil size={18} /> Rename group
+          </Button>
           <Button
             variant="secondary"
             className="w-full justify-start"
@@ -314,6 +335,30 @@ export default function LibraryPage() {
           setActionGroup(null);
         }}
       />
+
+      <Sheet
+        open={renameOpen}
+        onClose={() => {
+          setRenameOpen(false);
+          setActionGroup(null);
+        }}
+        title="Rename group"
+      >
+        <Input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          autoFocus
+          onKeyDown={(e) => e.key === "Enter" && renameActionGroup()}
+        />
+        <Button
+          className="mt-4 w-full"
+          size="lg"
+          disabled={!newName.trim()}
+          onClick={renameActionGroup}
+        >
+          Save
+        </Button>
+      </Sheet>
     </div>
   );
 }
