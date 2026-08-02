@@ -1,23 +1,28 @@
 import { NextResponse } from "next/server";
+import { isSentence } from "@/lib/scan-rules";
 import { authenticateUser, completeViaProviders } from "../_shared";
 
 /**
- * Generates one short, learner-friendly German definition per requested word:
- * Gemini first, Groq as fallback (keys configured in the back office and
- * stored in app_settings). Available to any signed-in user. Used by the
- * client-side definition backfill when the meaning language is set to
- * Deutsch, so meanings can be shown as German explanations instead of
- * English translations.
+ * Generates one short, learner-friendly German definition per requested
+ * entry: a dictionary-style definition for words, a simple paraphrase for
+ * sentence entries (marked "(Satz)" in the request). Gemini first, Groq as
+ * fallback (keys configured in the back office and stored in app_settings).
+ * Available to any signed-in user. Used by the client-side definition
+ * backfill when the meaning language is set to Deutsch, so meanings can be
+ * shown as German explanations instead of English translations.
  */
 
 const MAX_WORDS = 10;
-const MAX_DEFINITION_CHARS = 160;
+const MAX_DEFINITION_CHARS = 200;
 
-const SYSTEM_PROMPT = `You write German dictionary definitions for German vocabulary learners. For each word in the list, write ONE short German definition at A2 level (at most 12 words) that explains the word simply, the way a learner's dictionary would. Example: for "das Haus" write "Ein Gebäude, in dem Menschen wohnen." Respond ONLY with JSON in the form {"definitions": [{"word": "<the word exactly as given>", "de": "<German definition>"}]}.
+const SYSTEM_PROMPT = `You write German meanings for German vocabulary learners. The entries are numbered. For each entry, write ONE short German meaning at A2 level:
+- For a word: a definition (at most 12 words) that explains the word simply, the way a learner's dictionary would. Example: for "das Haus" write "Ein Gebäude, in dem Menschen wohnen." Do not use the word itself (or its direct compounds) inside its definition.
+- For an entry marked (Satz), which is a full sentence: a simple paraphrase of the sentence's meaning, using different words than the original where possible.
+
+Respond ONLY with JSON in the form {"definitions": [{"n": <entry number>, "de": "<German meaning>"}]}.
 
 Rules:
-- Cover every word in the list exactly once.
-- Do not use the word itself (or its direct compounds) inside its definition.
+- Cover every entry in the list exactly once, keyed by its number.
 - Use simple everyday German; one sentence, ending with a period.
 - No explanations, no extra fields.`;
 
@@ -28,11 +33,12 @@ interface RequestedWord {
   pos?: string;
 }
 
-/** One request line like: gehen (verb, "to go") */
-function describeWord(w: RequestedWord): string {
-  const hints = [w.pos, w.english ? `"${w.english}"` : ""].filter(Boolean).join(", ");
+/** One request line like: 1. gehen (verb, "to go") or 3. (Satz) Ich gehe ins Kino. */
+function describeWord(w: RequestedWord, index: number): string {
   const name = w.article ? `${w.article} ${w.german}` : w.german;
-  return hints ? `${name} (${hints})` : name;
+  if (isSentence(w.german)) return `${index + 1}. (Satz) ${name}`;
+  const hints = [w.pos, w.english ? `"${w.english}"` : ""].filter(Boolean).join(", ");
+  return `${index + 1}. ${hints ? `${name} (${hints})` : name}`;
 }
 
 function parseDefinitions(
@@ -45,19 +51,19 @@ function parseDefinitions(
   const json = start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned;
   const parsed = JSON.parse(json) as { definitions?: unknown };
 
-  const byKey = new Map(requested.map((w) => [w.german.toLowerCase(), w.german]));
-  const seen = new Set<string>();
+  const seen = new Set<number>();
   const out: { german: string; definitionDe: string }[] = [];
   for (const entry of Array.isArray(parsed.definitions) ? parsed.definitions : []) {
     if (typeof entry !== "object" || entry === null) continue;
-    const { word, de } = entry as { word?: unknown; de?: unknown };
-    if (typeof word !== "string" || typeof de !== "string") continue;
-    // models sometimes echo the article we sent along with the noun
-    const key = word.trim().toLowerCase().replace(/^(der|die|das)\s+/, "");
-    const german = byKey.get(key) ?? byKey.get(word.trim().toLowerCase());
-    if (!german || seen.has(german) || !de.trim()) continue;
-    seen.add(german);
-    out.push({ german, definitionDe: de.trim().slice(0, MAX_DEFINITION_CHARS) });
+    const { n, de } = entry as { n?: unknown; de?: unknown };
+    if (typeof n !== "number" || typeof de !== "string") continue;
+    const index = Math.round(n) - 1;
+    if (index < 0 || index >= requested.length || seen.has(index) || !de.trim()) continue;
+    seen.add(index);
+    out.push({
+      german: requested[index].german,
+      definitionDe: de.trim().slice(0, MAX_DEFINITION_CHARS),
+    });
   }
   return out;
 }
@@ -91,7 +97,7 @@ export async function POST(req: Request) {
       kind: "text",
       prompt: SYSTEM_PROMPT,
       text: words.map(describeWord).join("\n"),
-      textLabel: "Words",
+      textLabel: "Entries",
     },
     (content) => NextResponse.json({ definitions: parseDefinitions(content, words) }),
     { geminiTimeoutMs: 20_000, groqTimeoutMs: 15_000 }

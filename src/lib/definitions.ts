@@ -2,7 +2,6 @@
 
 import { db } from "./db";
 import { AI_DEFINITION_BATCH, generateDefinitionsWithAi } from "./ai";
-import { isSentence } from "./scan-rules";
 import { getSettings } from "./settings";
 import type { Word } from "./types";
 
@@ -74,8 +73,7 @@ export function restartDefinitionBackfill() {
 
 function needsDefinition(w: Word, attempts: Record<string, number>): boolean {
   if (w.status !== "ready" || w.definitionDe || w.id == null) return false;
-  // sentence entries from scans don't get dictionary-style definitions
-  if (isSentence(w.german)) return false;
+  // sentence entries get a simple German paraphrase (the route detects them)
   return (attempts[w.german.toLowerCase()] ?? 0) < MAX_ATTEMPTS;
 }
 
