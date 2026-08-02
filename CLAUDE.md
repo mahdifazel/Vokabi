@@ -75,7 +75,7 @@ src/
     learn/                 Learn hub, flashcards/, quiz/
     word/[id]/             Word detail (edit incl. group membership, practice, delete; verb sections for verbs)
     login/                 Standalone auth screen (no shell chrome)
-    settings/              Audio/theme/data/account/feedback
+    settings/              Audio/meaning language/theme/data/account/feedback
     admin/                 Back office UI (own layout + guard)
     api/admin/             Server route handlers (service-role)
     api/ai/                AI routes for signed-in users (word extraction + example/definition generation, Gemini→Groq)
@@ -87,6 +87,8 @@ src/
     ui.tsx                 Primitives: Button, Card, Input, Switch, Segmented, Sheet, Collapsible…
     interactive-menu.tsx   Animated bottom nav (icon bounce, label slides in beside it)
     new-group-sheet.tsx    "New group" flow: custom name or searchable preset browser
+    word-list.tsx          Word rows + long-press multi-select (bulk delete / move to group,
+                           select all, exits via Esc / back button / deselect)
     …                      Feature components (word-row, add-words-sheet, mini-player, splash,
                            verb-/adjective-/noun-details, example-card, …)
   lib/
