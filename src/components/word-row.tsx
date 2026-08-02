@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Heart, Loader2, Volume2 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -9,10 +8,8 @@ import { ARTICLE_BG } from "@/lib/types";
 import { playWordOnce, usePlayer } from "@/lib/player";
 import { useSettings } from "@/lib/settings";
 import { toggleFavorite, wordMeaning } from "@/lib/words";
+import { useLongPress } from "./use-long-press";
 import { cn } from "./ui";
-
-const LONG_PRESS_MS = 450;
-const MOVE_SLOP_PX = 10;
 
 export function WordRow({
   word,
@@ -38,59 +35,14 @@ export function WordRow({
     highlight ||
     (player.active && player.words[player.index]?.id != null && player.words[player.index].id === word.id);
 
-  const timerRef = useRef<number | null>(null);
-  const startRef = useRef({ x: 0, y: 0 });
-  const touchRef = useRef(false);
-  const suppressClickRef = useRef(false);
-
-  function cancelLongPress() {
-    if (timerRef.current != null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }
-
-  useEffect(() => cancelLongPress, []);
-
-  function armLongPress(e: React.PointerEvent) {
-    if (!onLongPress || selectionMode || e.button !== 0) return;
-    touchRef.current = e.pointerType !== "mouse";
-    startRef.current = { x: e.clientX, y: e.clientY };
-    cancelLongPress();
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null;
-      suppressClickRef.current = true;
-      navigator.vibrate?.(15);
-      onLongPress();
-    }, LONG_PRESS_MS);
-  }
-
-  function trackPointer(e: React.PointerEvent) {
-    if (timerRef.current == null) return;
-    const dx = e.clientX - startRef.current.x;
-    const dy = e.clientY - startRef.current.y;
-    if (Math.hypot(dx, dy) > MOVE_SLOP_PX) cancelLongPress();
-  }
+  const longPress = useLongPress(onLongPress, !selectionMode);
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.3) }}
-      onPointerDown={armLongPress}
-      onPointerMove={trackPointer}
-      onPointerUp={cancelLongPress}
-      onPointerCancel={cancelLongPress}
-      onClickCapture={(e) => {
-        if (suppressClickRef.current) {
-          suppressClickRef.current = false;
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      }}
-      onContextMenu={(e) => {
-        if (touchRef.current && onLongPress) e.preventDefault();
-      }}
+      {...longPress}
       className={cn(
         "relative flex select-none items-center gap-3 rounded-3xl border bg-surface p-3 pl-4 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_4px_14px_rgb(0_0_0/0.05)] transition-colors [-webkit-touch-callout:none]",
         selected

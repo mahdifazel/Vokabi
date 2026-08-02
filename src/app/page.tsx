@@ -7,21 +7,25 @@ import { useLiveQuery } from "dexie-react-hooks";
 import {
   BookOpen,
   ChevronRight,
+  FolderInput,
   FolderOpen,
   FolderPlus,
   Heart,
   Plus,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { matchesQuery } from "@/lib/words";
-import { GROUP_TILES } from "@/lib/types";
+import { deleteGroupAndDetachWords, deleteGroupAndWords, matchesQuery } from "@/lib/words";
+import { GROUP_TILES, type Group } from "@/lib/types";
 import { WordList } from "@/components/word-list";
 import { AddWordsSheet } from "@/components/add-words-sheet";
 import { NewGroupSheet } from "@/components/new-group-sheet";
+import { MergeGroupSheet } from "@/components/merge-group-sheet";
+import { useLongPress } from "@/components/use-long-press";
 import { VokabiLogo } from "@/components/logo";
-import { Button, Card, EmptyState, Input, cn } from "@/components/ui";
+import { Button, Card, EmptyState, Input, Sheet, cn } from "@/components/ui";
 
 function cardReveal(index: number) {
   return {
@@ -31,10 +35,54 @@ function cardReveal(index: number) {
   };
 }
 
+function GroupCard({
+  group,
+  count,
+  index,
+  onLongPress,
+}: {
+  group: Group;
+  count: number;
+  index: number;
+  onLongPress: () => void;
+}) {
+  const longPress = useLongPress(onLongPress);
+  return (
+    <motion.div
+      {...cardReveal(index)}
+      {...longPress}
+      className="select-none [-webkit-touch-callout:none]"
+    >
+      <Link href={`/groups/${group.id}`} className="cursor-pointer">
+        <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
+          <div
+            className={cn(
+              "flex h-11 w-11 items-center justify-center rounded-2xl",
+              GROUP_TILES[(group.id ?? 0) % GROUP_TILES.length]
+            )}
+          >
+            <FolderOpen size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-extrabold">{group.name}</p>
+            <p className="text-sm font-semibold text-muted">
+              {count} word{count === 1 ? "" : "s"}
+            </p>
+          </div>
+          <ChevronRight size={18} className="text-muted" />
+        </Card>
+      </Link>
+    </motion.div>
+  );
+}
+
 export default function LibraryPage() {
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [actionGroup, setActionGroup] = useState<Group | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   const words = useLiveQuery(() => db.words.orderBy("createdAt").reverse().toArray(), []);
   const groups = useLiveQuery(() => db.groups.orderBy("name").toArray(), []);
@@ -47,6 +95,16 @@ export default function LibraryPage() {
     }
     return map;
   }, [words]);
+
+  const actionCount = actionGroup?.id != null ? (counts.get(actionGroup.id) ?? 0) : 0;
+
+  async function removeActionGroup(withWords: boolean) {
+    if (actionGroup?.id == null) return;
+    if (withWords) await deleteGroupAndWords(actionGroup.id);
+    else await deleteGroupAndDetachWords(actionGroup.id);
+    setActionGroup(null);
+    setConfirmDelete(false);
+  }
 
   const searching = query.trim().length > 0;
   const results = useMemo(
@@ -155,33 +213,19 @@ export default function LibraryPage() {
             </motion.div>
           )}
 
-          {/* Groups */}
-          {groups?.map((g, i) => {
-            const n = counts.get(g.id!) ?? 0;
-            return (
-              <motion.div key={g.id} {...cardReveal(i + 2)}>
-                <Link href={`/groups/${g.id}`} className="cursor-pointer">
-                  <Card className="flex items-center gap-3 p-4 transition-transform active:scale-[0.98]">
-                    <div
-                      className={cn(
-                        "flex h-11 w-11 items-center justify-center rounded-2xl",
-                        GROUP_TILES[(g.id ?? 0) % GROUP_TILES.length]
-                      )}
-                    >
-                      <FolderOpen size={20} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-extrabold">{g.name}</p>
-                      <p className="text-sm font-semibold text-muted">
-                        {n} word{n === 1 ? "" : "s"}
-                      </p>
-                    </div>
-                    <ChevronRight size={18} className="text-muted" />
-                  </Card>
-                </Link>
-              </motion.div>
-            );
-          })}
+          {/* Groups, long press for delete/merge */}
+          {groups?.map((g, i) => (
+            <GroupCard
+              key={g.id}
+              group={g}
+              count={counts.get(g.id!) ?? 0}
+              index={i + 2}
+              onLongPress={() => {
+                setConfirmDelete(false);
+                setActionGroup(g);
+              }}
+            />
+          ))}
         </div>
       )}
 
@@ -197,6 +241,79 @@ export default function LibraryPage() {
       <AddWordsSheet open={addOpen} onClose={() => setAddOpen(false)} />
 
       <NewGroupSheet open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      {/* long-press group actions */}
+      <Sheet
+        open={actionGroup !== null && !mergeOpen}
+        onClose={() => {
+          setActionGroup(null);
+          setConfirmDelete(false);
+        }}
+        title={actionGroup?.name ?? "Group"}
+      >
+        <div className="flex flex-col gap-2 pb-2">
+          <Button
+            variant="secondary"
+            className="w-full justify-start"
+            onClick={() => setMergeOpen(true)}
+          >
+            <FolderInput size={18} /> Merge into another group
+          </Button>
+          {!confirmDelete ? (
+            <Button
+              variant="destructive"
+              className="w-full justify-start"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 size={18} /> Delete group
+            </Button>
+          ) : (
+            <div className="rounded-2xl bg-destructive/10 p-4">
+              <p className="mb-1 text-sm font-bold text-destructive">
+                Delete “{actionGroup?.name}”?
+              </p>
+              {actionCount > 0 ? (
+                <>
+                  <p className="mb-3 text-xs font-semibold text-destructive/80">
+                    You can keep its {actionCount} word{actionCount === 1 ? "" : "s"} in your
+                    library, or delete them too. Words that are also in other groups are never
+                    deleted.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <Button variant="secondary" className="w-full" onClick={() => removeActionGroup(false)}>
+                      Delete group, keep words
+                    </Button>
+                    <Button className="w-full bg-destructive text-white" onClick={() => removeActionGroup(true)}>
+                      Delete group and words
+                    </Button>
+                    <Button variant="ghost" className="w-full" onClick={() => setConfirmDelete(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-2 flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(false)}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" className="bg-destructive text-white" onClick={() => removeActionGroup(false)}>
+                    Delete
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Sheet>
+
+      <MergeGroupSheet
+        group={actionGroup}
+        open={mergeOpen}
+        onClose={() => {
+          setMergeOpen(false);
+          setActionGroup(null);
+        }}
+      />
     </div>
   );
 }

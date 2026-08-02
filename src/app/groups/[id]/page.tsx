@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   ArrowLeft,
+  FolderInput,
   FolderOpen,
   MoreVertical,
   Pencil,
@@ -19,6 +20,7 @@ import { startPlaylist } from "@/lib/player";
 import { updateSettings, useSettings } from "@/lib/settings";
 import { WordList } from "@/components/word-list";
 import { AddWordsSheet } from "@/components/add-words-sheet";
+import { MergeGroupSheet } from "@/components/merge-group-sheet";
 import { Button, EmptyState, Input, Sheet } from "@/components/ui";
 
 export default function GroupDetailPage({
@@ -34,6 +36,7 @@ export default function GroupDetailPage({
   const [addOpen, setAddOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newName, setNewName] = useState("");
 
@@ -146,6 +149,16 @@ export default function GroupDetailPage({
           >
             <Pencil size={18} /> Rename group
           </Button>
+          <Button
+            variant="secondary"
+            className="w-full justify-start"
+            onClick={() => {
+              setMenuOpen(false);
+              setMergeOpen(true);
+            }}
+          >
+            <FolderInput size={18} /> Merge into another group
+          </Button>
           {!confirmDelete ? (
             <Button
               variant="destructive"
@@ -207,6 +220,13 @@ export default function GroupDetailPage({
           )}
         </div>
       </Sheet>
+
+      <MergeGroupSheet
+        group={group ?? null}
+        open={mergeOpen}
+        onClose={() => setMergeOpen(false)}
+        onMerged={() => router.replace("/groups")}
+      />
 
       <Sheet open={renameOpen} onClose={() => setRenameOpen(false)} title="Rename group">
         <Input

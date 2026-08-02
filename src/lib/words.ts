@@ -385,6 +385,19 @@ export async function moveWordsToGroup(
   scheduleSync();
 }
 
+/**
+ * Merge one group into another: all its words move to the target group
+ * (keeping any other memberships they have), then the emptied source group
+ * is deleted.
+ */
+export async function mergeGroupInto(sourceGroupId: number, targetGroupId: number) {
+  if (sourceGroupId === targetGroupId) return;
+  const members = await db.words.where("groupIds").equals(sourceGroupId).toArray();
+  const ids = members.map((w) => w.id).filter((id): id is number => id != null);
+  if (ids.length > 0) await moveWordsToGroup(ids, targetGroupId, sourceGroupId);
+  await deleteGroupAndDetachWords(sourceGroupId);
+}
+
 export async function deleteGroupAndDetachWords(groupId: number) {
   const members = await db.words.where("groupIds").equals(groupId).toArray();
   const group = await db.groups.get(groupId);
