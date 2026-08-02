@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AnimatePresence, motion } from "framer-motion";
-import { FolderInput, FolderOpen, Trash2, X } from "lucide-react";
+import { FolderInput, FolderOpen, ListChecks, Trash2, X } from "lucide-react";
 import { db } from "@/lib/db";
 import type { Word } from "@/lib/types";
 import { GROUP_TILES } from "@/lib/types";
@@ -85,6 +85,12 @@ export function WordList({
     else setSelected(next);
   }
 
+  function selectAll() {
+    const ids = words.map((w) => w.id).filter((id): id is number => id != null);
+    if (selected.size === ids.length) exit();
+    else setSelected(new Set(ids));
+  }
+
   async function removeSelected() {
     const ids = [...selected];
     setConfirmOpen(false);
@@ -142,6 +148,17 @@ export function WordList({
                 <p aria-live="polite" className="flex-1 text-[15px] font-extrabold">
                   {n} selected
                 </p>
+                <button
+                  onClick={selectAll}
+                  aria-label={n === words.length ? "Deselect all words" : "Select all words"}
+                  aria-pressed={n === words.length}
+                  className={cn(
+                    "flex h-11 w-11 cursor-pointer items-center justify-center rounded-2xl active:bg-surface-2",
+                    n === words.length ? "text-primary" : "text-muted"
+                  )}
+                >
+                  <ListChecks size={20} />
+                </button>
                 <button
                   onClick={() => setMoveOpen(true)}
                   aria-label="Move selected words to a group"
