@@ -5,7 +5,7 @@ import { Heart, Play, Shuffle } from "lucide-react";
 import { db } from "@/lib/db";
 import { startPlaylist } from "@/lib/player";
 import { updateSettings, useSettings } from "@/lib/settings";
-import { WordRow } from "@/components/word-row";
+import { WordList } from "@/components/word-list";
 import { Button, EmptyState } from "@/components/ui";
 
 export default function FavoritesPage() {
@@ -48,11 +48,7 @@ export default function FavoritesPage() {
           hint="Tap the heart on any word to collect it here. Favorites work like their own group."
         />
       ) : (
-        <div className="flex flex-col gap-2.5">
-          {words?.map((w, i) => (
-            <WordRow key={w.id} word={w} index={i} />
-          ))}
-        </div>
+        words && <WordList words={words} />
       )}
     </div>
   );

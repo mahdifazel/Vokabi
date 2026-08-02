@@ -17,7 +17,7 @@ import {
 import { db } from "@/lib/db";
 import { matchesQuery } from "@/lib/words";
 import { GROUP_TILES } from "@/lib/types";
-import { WordRow } from "@/components/word-row";
+import { WordList } from "@/components/word-list";
 import { AddWordsSheet } from "@/components/add-words-sheet";
 import { NewGroupSheet } from "@/components/new-group-sheet";
 import { VokabiLogo } from "@/components/logo";
@@ -100,11 +100,7 @@ export default function LibraryPage() {
         results.length === 0 ? (
           <EmptyState icon={<Search size={28} />} title="Nothing found" hint={`No words match “${query}”.`} />
         ) : (
-          <div className="flex flex-col gap-2.5">
-            {results.map((w, i) => (
-              <WordRow key={w.id} word={w} index={i} />
-            ))}
-          </div>
+          <WordList words={results} />
         )
       ) : words && words.length === 0 && (groups?.length ?? 0) <= 1 ? (
         <EmptyState

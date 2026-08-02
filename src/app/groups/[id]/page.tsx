@@ -17,7 +17,7 @@ import { db } from "@/lib/db";
 import { deleteGroupAndDetachWords, deleteGroupAndWords } from "@/lib/words";
 import { startPlaylist } from "@/lib/player";
 import { updateSettings, useSettings } from "@/lib/settings";
-import { WordRow } from "@/components/word-row";
+import { WordList } from "@/components/word-list";
 import { AddWordsSheet } from "@/components/add-words-sheet";
 import { Button, EmptyState, Input, Sheet } from "@/components/ui";
 
@@ -119,11 +119,7 @@ export default function GroupDetailPage({
           }
         />
       ) : (
-        <div className="flex flex-col gap-2.5">
-          {words?.map((w, i) => (
-            <WordRow key={w.id} word={w} index={i} />
-          ))}
-        </div>
+        words && <WordList words={words} fromGroupId={groupId} />
       )}
 
       {words && words.length > 0 && (

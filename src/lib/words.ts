@@ -348,6 +348,40 @@ export async function deleteWord(wordId: number) {
   scheduleSync();
 }
 
+export async function deleteWords(wordIds: number[]) {
+  const words = await db.words.bulkGet(wordIds);
+  await db.transaction("rw", db.words, db.outbox, async () => {
+    for (const w of words) {
+      if (w?.uid) await db.outbox.add({ table: "words", uid: w.uid });
+    }
+    await db.words.bulkDelete(wordIds);
+  });
+  scheduleSync();
+}
+
+/**
+ * Move words into a group. With `fromGroupId` (moving out of a specific group)
+ * other memberships are preserved; without it the words end up in the target
+ * group only, since there is no source group to subtract.
+ */
+export async function moveWordsToGroup(
+  wordIds: number[],
+  targetGroupId: number,
+  fromGroupId?: number
+) {
+  const words = await db.words.bulkGet(wordIds);
+  await db.transaction("rw", db.words, async () => {
+    for (const w of words) {
+      if (!w || w.id == null) continue;
+      const rest =
+        fromGroupId != null ? w.groupIds.filter((g) => g !== fromGroupId) : [];
+      const next = rest.includes(targetGroupId) ? rest : [...rest, targetGroupId];
+      await db.words.update(w.id, { groupIds: next });
+    }
+  });
+  scheduleSync();
+}
+
 export async function deleteGroupAndDetachWords(groupId: number) {
   const members = await db.words.where("groupIds").equals(groupId).toArray();
   const group = await db.groups.get(groupId);
