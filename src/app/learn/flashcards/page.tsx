@@ -6,10 +6,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check, RotateCcw, Volume2, X } from "lucide-react";
 import { loadSourceWords, parseSource, shuffle, sourceLabel } from "@/lib/learn";
 import { playWordOnce } from "@/lib/player";
+import { useSettings } from "@/lib/settings";
+import { wordMeaning } from "@/lib/words";
 import { ARTICLE_BG, type Word } from "@/lib/types";
 import { Button, cn } from "@/components/ui";
 
 function FlashcardsContent() {
+  const { meaningLanguage } = useSettings();
   const router = useRouter();
   const params = useSearchParams();
   const src = parseSource(params.get("src"));
@@ -187,7 +190,7 @@ function FlashcardsContent() {
                     style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
                   >
                     <p className="text-3xl font-black tracking-tight">
-                      {word.english ?? "no translation"}
+                      {wordMeaning(word, meaningLanguage) ?? "no translation"}
                     </p>
                     {word.plural && (
                       <p className="mt-3 text-sm font-bold text-muted">

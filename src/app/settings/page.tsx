@@ -23,6 +23,7 @@ import {
   wordsToJSON,
   type ImportResult,
 } from "@/lib/words";
+import { scheduleDefinitionBackfill } from "@/lib/definitions";
 import { clearDiagLog, getDiagLog } from "@/lib/diag";
 import { Button, Card, Collapsible, Segmented, Switch, cn } from "@/components/ui";
 import { AccountCard } from "@/components/account-card";
@@ -192,7 +193,7 @@ export default function SettingsPage() {
             label="Read article"
           />
         </Row>
-        <Row label="Read translation" hint="Speak the English meaning after each word">
+        <Row label="Read translation" hint="Speak the meaning after each word">
           <Switch
             checked={settings.readTranslation}
             onCheckedChange={(v) => updateSettings({ readTranslation: v })}
@@ -237,6 +238,30 @@ export default function SettingsPage() {
           <Button variant="secondary" size="sm" onClick={() => void previewVoice()}>
             <Volume2 size={16} /> Preview voice
           </Button>
+        </div>
+      </Card>
+
+      {/* Meaning language */}
+      <Card className="mb-4 px-4 py-2">
+        <p className="pt-3 pb-1 text-xs font-extrabold tracking-wide text-muted uppercase">
+          Meaning language
+        </p>
+        <div className="py-3">
+          <Segmented
+            options={["en", "de"] as const}
+            value={settings.meaningLanguage}
+            onChange={(v) => {
+              updateSettings({ meaningLanguage: v });
+              // fill missing German definitions right away on switch
+              if (v === "de") scheduleDefinitionBackfill();
+            }}
+            format={(v) => (v === "en" ? "English" : "Deutsch")}
+          />
+          <p className="mt-2 pb-1 text-sm font-semibold text-muted">
+            {settings.meaningLanguage === "de"
+              ? "Words show a simple German definition. Missing definitions are filled in automatically in the background."
+              : "Words show their English translation."}
+          </p>
         </div>
       </Card>
 

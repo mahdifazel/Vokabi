@@ -10,12 +10,16 @@ import {
   stopPlayer,
   usePlayer,
 } from "@/lib/player";
+import { useSettings } from "@/lib/settings";
+import { wordMeaning } from "@/lib/words";
 import { ARTICLE_COLORS } from "@/lib/types";
 import { cn } from "./ui";
 
 export function MiniPlayer() {
   const player = usePlayer();
+  const { meaningLanguage } = useSettings();
   const word = player.words[Math.min(player.index, player.words.length - 1)];
+  const meaning = word ? wordMeaning(word, meaningLanguage) : undefined;
 
   return (
     <AnimatePresence>
@@ -42,8 +46,8 @@ export function MiniPlayer() {
                 )}
                 {word.german}
               </p>
-              {word.english && (
-                <p className="mt-1 break-words text-sm font-semibold text-muted">{word.english}</p>
+              {meaning && (
+                <p className="mt-1 break-words text-sm font-semibold text-muted">{meaning}</p>
               )}
               <p className="mt-1.5 text-xs font-semibold text-muted">
                 {player.title} · {player.index + 1}/{player.words.length}

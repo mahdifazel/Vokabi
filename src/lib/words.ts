@@ -4,7 +4,8 @@ import { buildWord, lookupWord, splitWordList, type ParsedInput } from "./dictio
 import { fetchPresetGroups } from "./presets";
 import { scheduleExampleBackfill } from "./examples";
 import { scheduleSync } from "./sync";
-import type { Group, PartOfSpeech, Word } from "./types";
+import { scheduleDefinitionBackfill } from "./definitions";
+import type { AppSettings, Group, PartOfSpeech, Word } from "./types";
 
 /**
  * When the caller didn't pick any groups and exactly one group exists,
@@ -79,6 +80,8 @@ async function enrichWords(items: { input: ParsedInput; word: Word }[]) {
   );
   // words whose lookup had no usable example get an AI-generated one
   scheduleExampleBackfill();
+  // and a German definition when the meaning language is Deutsch
+  scheduleDefinitionBackfill();
 }
 
 // guards against the same word being enriched twice concurrently (e.g. a
@@ -430,9 +433,23 @@ export function matchesQuery(word: Word, query: string): boolean {
   return (
     word.german.toLowerCase().includes(q) ||
     (word.english?.toLowerCase().includes(q) ?? false) ||
+    (word.definitionDe?.toLowerCase().includes(q) ?? false) ||
     (word.article?.toLowerCase() === q) ||
     (word.plural?.toLowerCase().includes(q) ?? false)
   );
+}
+
+/**
+ * The meaning to display for a word under the current meaning language.
+ * Deutsch shows the German definition, falling back to the English
+ * translation while the definition backfill hasn't reached the word yet.
+ */
+export function wordMeaning(
+  word: Word,
+  lang: AppSettings["meaningLanguage"]
+): string | undefined {
+  if (lang === "de") return word.definitionDe || word.english;
+  return word.english;
 }
 
 // ---------------------------------------------------------------------------

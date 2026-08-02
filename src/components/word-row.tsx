@@ -7,7 +7,8 @@ import { motion } from "framer-motion";
 import type { Word } from "@/lib/types";
 import { ARTICLE_BG } from "@/lib/types";
 import { playWordOnce, usePlayer } from "@/lib/player";
-import { toggleFavorite } from "@/lib/words";
+import { useSettings } from "@/lib/settings";
+import { toggleFavorite, wordMeaning } from "@/lib/words";
 import { cn } from "./ui";
 
 const LONG_PRESS_MS = 450;
@@ -32,6 +33,7 @@ export function WordRow({
 }) {
   const router = useRouter();
   const player = usePlayer();
+  const { meaningLanguage } = useSettings();
   const isCurrent =
     highlight ||
     (player.active && player.words[player.index]?.id != null && player.words[player.index].id === word.id);
@@ -136,7 +138,7 @@ export function WordRow({
               <Loader2 size={12} className="animate-spin" /> looking up…
             </span>
           ) : (
-            word.english || "no translation found"
+            wordMeaning(word, meaningLanguage) || "no translation found"
           )}
         </p>
       </button>

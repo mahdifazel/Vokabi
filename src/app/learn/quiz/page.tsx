@@ -8,10 +8,12 @@ import {
   buildQuiz,
   loadSourceWords,
   parseSource,
+  primaryMeaning,
   sourceLabel,
   type QuizQuestion,
 } from "@/lib/learn";
 import { playWordOnce } from "@/lib/player";
+import { getSettings } from "@/lib/settings";
 import { ARTICLE_COLORS, type Word } from "@/lib/types";
 import { Button, cn } from "@/components/ui";
 
@@ -40,7 +42,7 @@ function QuizContent() {
     Promise.all([loadSourceWords(src), sourceLabel(src)]).then(([words, l]) => {
       if (cancelled) return;
       setPool(words);
-      setQuestions(buildQuiz(words));
+      setQuestions(buildQuiz(words, 15, getSettings().meaningLanguage));
       setLabel(l);
     });
     return () => {
@@ -67,7 +69,7 @@ function QuizContent() {
 
   function restart() {
     if (!pool) return;
-    setQuestions(buildQuiz(pool));
+    setQuestions(buildQuiz(pool, 15, getSettings().meaningLanguage));
     setIndex(0);
     setSelected(null);
     setScore(0);
@@ -145,7 +147,7 @@ function QuizContent() {
                       {m.word.german}
                     </span>
                     <span className="truncate font-semibold text-muted">
-                      {m.word.english?.split(";")[0]}
+                      {primaryMeaning(m.word, getSettings().meaningLanguage)}
                     </span>
                   </li>
                 ))}

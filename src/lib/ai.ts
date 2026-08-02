@@ -106,6 +106,48 @@ export async function generateExamplesWithAi(words: AiExampleWord[]): Promise<Ai
   }
 }
 
+/** How many words each /api/ai/definitions request may carry (server cap). */
+export const AI_DEFINITION_BATCH = 10;
+
+export interface AiDefinition {
+  german: string;
+  definitionDe: string;
+}
+
+export type AiDefinitionsResult = AiDefinition[] | "rate-limited" | null;
+
+/** Generate short German definitions for words that have none. */
+export async function generateDefinitionsWithAi(
+  words: AiExampleWord[]
+): Promise<AiDefinitionsResult> {
+  try {
+    const token = await getSessionToken();
+    if (!token) return null;
+    const res = await fetch("/api/ai/definitions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ words }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (res.status === 429) return "rate-limited";
+    if (!res.ok) return null;
+
+    const json = (await res.json()) as { definitions?: unknown };
+    return (Array.isArray(json.definitions) ? json.definitions : []).filter(
+      (d): d is AiDefinition =>
+        typeof d === "object" && d !== null &&
+        typeof (d as AiDefinition).german === "string" &&
+        typeof (d as AiDefinition).definitionDe === "string" &&
+        (d as AiDefinition).definitionDe.trim().length > 0
+    );
+  } catch {
+    return null;
+  }
+}
+
 /** Pull the vocabulary straight out of a scanned photo via a vision model. */
 export async function extractWordsFromImageWithAi(
   canvas: HTMLCanvasElement

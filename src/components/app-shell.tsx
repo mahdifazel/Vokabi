@@ -12,6 +12,7 @@ import { cloudConfigured } from "@/lib/supabase";
 import { initSync, syncNow } from "@/lib/sync";
 import { backfillMissingWordFields, ensureWordsGrouped, resumePendingEnrichment } from "@/lib/words";
 import { scheduleExampleBackfill } from "@/lib/examples";
+import { scheduleDefinitionBackfill } from "@/lib/definitions";
 import { MiniPlayer } from "./mini-player";
 import { Splash } from "./splash";
 import { AnnouncementBanner } from "./announcement-banner";
@@ -85,6 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       void resumePendingEnrichment();
       void backfillMissingWordFields();
       scheduleExampleBackfill();
+      scheduleDefinitionBackfill();
     }
     // keep "system" theme in sync when OS theme changes
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

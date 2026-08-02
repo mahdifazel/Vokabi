@@ -12,6 +12,7 @@ import {
   seedDefaultPresetGroups,
 } from "./words";
 import { scheduleExampleBackfill } from "./examples";
+import { scheduleDefinitionBackfill } from "./definitions";
 import type { Article, PartOfSpeech, Word, WordStatus } from "./types";
 
 export interface SyncState {
@@ -127,6 +128,7 @@ export async function syncNow(): Promise<void> {
           pos: w.pos ?? null,
           example: w.example ?? null,
           example_en: w.exampleEn ?? null,
+          definition_de: w.definitionDe ?? null,
           notes: w.notes ?? null,
           favorite: !!w.favorite,
           group_uids: w.groupIds
@@ -191,6 +193,7 @@ export async function syncNow(): Promise<void> {
           pos: (r.pos ?? undefined) as PartOfSpeech | undefined,
           example: r.example ?? undefined,
           exampleEn: r.example_en ?? undefined,
+          definitionDe: r.definition_de ?? undefined,
           notes: r.notes ?? undefined,
           favorite: r.favorite ? 1 : 0,
           groupIds,
@@ -247,6 +250,9 @@ export async function syncNow(): Promise<void> {
     // fill in example sentences for words that still lack one (delayed +
     // batched; a no-op when everything has an example already)
     scheduleExampleBackfill();
+
+    // same for German definitions when the meaning language is Deutsch
+    scheduleDefinitionBackfill();
 
     const now = Date.now();
     localStorage.setItem(LAST_SYNC_KEY, String(now));

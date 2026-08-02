@@ -31,6 +31,8 @@ export interface Word {
   pos?: PartOfSpeech;
   example?: string;
   exampleEn?: string;
+  /** simple German definition, shown when the meaning language is Deutsch */
+  definitionDe?: string;
   notes?: string;
   favorite: 0 | 1; // number so Dexie can index it
   groupIds: number[];
@@ -71,6 +73,8 @@ export interface AppSettings {
   theme: "system" | "light" | "dark";
   /** preferred German voice URI, empty = auto-pick best */
   germanVoice: string;
+  /** language of the displayed meaning: English translation or German definition */
+  meaningLanguage: "en" | "de";
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -83,6 +87,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   shuffle: false,
   theme: "dark",
   germanVoice: "",
+  meaningLanguage: "en",
 };
 
 /** Cached result of an online dictionary lookup */
@@ -97,6 +102,7 @@ export interface DictEntry {
   pos?: PartOfSpeech;
   example?: string;
   exampleEn?: string;
+  definitionDe?: string;
   /** true when the online lookup found nothing */
   miss?: boolean;
   fetchedAt: number;

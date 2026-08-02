@@ -136,6 +136,7 @@ export function buildWord(
     pos: entry?.pos ?? (isNoun ? "noun" : undefined),
     example: entry?.example,
     exampleEn: entry?.exampleEn,
+    definitionDe: entry?.definitionDe,
     favorite: 0,
     groupIds,
     status: entry ? "ready" : "notfound",

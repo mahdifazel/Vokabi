@@ -1,5 +1,5 @@
 import { db } from "./db";
-import type { Word } from "./types";
+import type { AppSettings, Word } from "./types";
 
 export type LearnSource =
   | { kind: "all" }
@@ -56,26 +56,36 @@ export interface QuizQuestion {
   correct: string;
 }
 
-function primaryEnglish(w: Word): string | undefined {
+/** The word's primary meaning under the given meaning language. */
+export function primaryMeaning(
+  w: Word,
+  lang: AppSettings["meaningLanguage"] = "en"
+): string | undefined {
+  if (lang === "de" && w.definitionDe?.trim()) return w.definitionDe.trim();
   return w.english?.split(";")[0]?.trim() || undefined;
 }
 
 /** Build a quiz of up to `count` questions from the given words. */
-export function buildQuiz(words: Word[], count = 15): QuizQuestion[] {
-  const usable = shuffle(words.filter((w) => primaryEnglish(w) || w.article));
-  const englishPool = [
-    ...new Set(words.map(primaryEnglish).filter((e): e is string => !!e)),
+export function buildQuiz(
+  words: Word[],
+  count = 15,
+  lang: AppSettings["meaningLanguage"] = "en"
+): QuizQuestion[] {
+  const meaningOf = (w: Word) => primaryMeaning(w, lang);
+  const usable = shuffle(words.filter((w) => meaningOf(w) || w.article));
+  const meaningPool = [
+    ...new Set(words.map(meaningOf).filter((e): e is string => !!e)),
   ];
   const germanPool = [...new Set(words.map((w) => w.german))];
 
   const questions: QuizQuestion[] = [];
   for (const word of usable) {
     if (questions.length >= count) break;
-    const english = primaryEnglish(word);
+    const meaning = meaningOf(word);
 
     const types: QuizType[] = [];
-    if (english && englishPool.length >= 2) types.push("de-en");
-    if (english && germanPool.length >= 2) types.push("en-de");
+    if (meaning && meaningPool.length >= 2) types.push("de-en");
+    if (meaning && germanPool.length >= 2) types.push("en-de");
     if (word.article) types.push("article");
     if (types.length === 0) continue;
 
@@ -90,8 +100,8 @@ export function buildQuiz(words: Word[], count = 15): QuizQuestion[] {
         correct: word.article!,
       });
     } else if (type === "de-en") {
-      const correct = english!;
-      const distractors = shuffle(englishPool.filter((e) => e !== correct)).slice(0, 3);
+      const correct = meaning!;
+      const distractors = shuffle(meaningPool.filter((e) => e !== correct)).slice(0, 3);
       questions.push({
         word,
         type,
@@ -105,7 +115,7 @@ export function buildQuiz(words: Word[], count = 15): QuizQuestion[] {
       questions.push({
         word,
         type,
-        prompt: english!,
+        prompt: meaning!,
         options: shuffle([correct, ...distractors]),
         correct,
       });

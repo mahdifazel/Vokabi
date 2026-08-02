@@ -14,10 +14,10 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { ARTICLE_BG, type Article, type PartOfSpeech } from "@/lib/types";
-import { deleteWord, ensureWordsGrouped, toggleFavorite } from "@/lib/words";
+import { deleteWord, ensureWordsGrouped, toggleFavorite, wordMeaning } from "@/lib/words";
 import { playWordOnce, wordSpokenText } from "@/lib/player";
 import { speak } from "@/lib/tts";
-import { getSettings } from "@/lib/settings";
+import { getSettings, useSettings } from "@/lib/settings";
 import { PracticeSheet } from "@/components/practice-sheet";
 import { AdjectiveDetails } from "@/components/adjective-details";
 import { ExampleCard } from "@/components/example-card";
@@ -52,6 +52,7 @@ export default function WordDetailPage({
   const router = useRouter();
 
   const word = useLiveQuery(() => db.words.get(wordId), [wordId]);
+  const { meaningLanguage } = useSettings();
   const groups = useLiveQuery(() => db.groups.orderBy("name").toArray(), []) ?? [];
 
   const [practiceOpen, setPracticeOpen] = useState(false);
@@ -62,6 +63,7 @@ export default function WordDetailPage({
     article: "" as Article | "",
     pos: "" as PartOfSpeech | "",
     english: "",
+    definitionDe: "",
     plural: "",
     example: "",
     exampleEn: "",
@@ -88,6 +90,7 @@ export default function WordDetailPage({
       article: word.article ?? "",
       pos: word.pos ?? "",
       english: word.english ?? "",
+      definitionDe: word.definitionDe ?? "",
       plural: word.plural ?? "",
       example: word.example ?? "",
       exampleEn: word.exampleEn ?? "",
@@ -104,6 +107,7 @@ export default function WordDetailPage({
       article: draft.article || undefined,
       pos: draft.pos || undefined,
       english: draft.english.trim() || undefined,
+      definitionDe: draft.definitionDe.trim() || undefined,
       plural: draft.plural.trim() || undefined,
       example: draft.example.trim() || undefined,
       exampleEn: draft.exampleEn.trim() || undefined,
@@ -179,7 +183,9 @@ export default function WordDetailPage({
         )}
         <h1 className="text-4xl font-black tracking-tight">{word.german}</h1>
         {word.ipa && <p className="mt-1 text-base font-semibold text-muted">{word.ipa}</p>}
-        <p className="mt-2 text-xl font-bold text-muted">{word.english ?? "-"}</p>
+        <p className="mt-2 text-xl font-bold text-muted">
+          {wordMeaning(word, meaningLanguage) ?? "-"}
+        </p>
         {(word.plural || word.pos) && (
           <p className="mt-1 text-sm font-semibold text-muted">
             {word.pos}
@@ -363,6 +369,16 @@ export default function WordDetailPage({
               className="mt-1"
               value={draft.english}
               onChange={(e) => setDraft({ ...draft, english: e.target.value })}
+            />
+          </label>
+          <label className="text-sm font-extrabold">
+            German definition
+            <Textarea
+              className="mt-1"
+              rows={2}
+              value={draft.definitionDe}
+              onChange={(e) => setDraft({ ...draft, definitionDe: e.target.value })}
+              lang="de"
             />
           </label>
           <label className="text-sm font-extrabold">

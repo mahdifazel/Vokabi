@@ -20,6 +20,7 @@ create table if not exists public.words (
   pos text,
   example text,
   example_en text,
+  definition_de text,
   notes text,
   favorite boolean not null default false,
   group_uids uuid[] not null default '{}',
@@ -27,6 +28,9 @@ create table if not exists public.words (
   created_at bigint not null,
   updated_at bigint not null
 );
+
+-- Existing projects: bring an already-created words table up to date
+alter table public.words add column if not exists definition_de text;
 
 create index if not exists words_user_idx on public.words (user_id);
 create index if not exists groups_user_idx on public.groups (user_id);

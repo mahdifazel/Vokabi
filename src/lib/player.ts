@@ -77,9 +77,10 @@ function updateMediaSession() {
   }
   const word = state.words[Math.min(state.index, state.words.length - 1)];
   if (word) {
+    const s = getSettings();
     ms.metadata = new MediaMetadata({
       title: word.article ? `${word.article} ${word.german}` : word.german,
-      artist: word.english ?? "",
+      artist: (s.meaningLanguage === "de" ? word.definitionDe || word.english : word.english) ?? "",
       album: `Vokabi · ${state.title}`,
       artwork: [{ src: "/icon.svg", sizes: "512x512", type: "image/svg+xml" }],
     });
@@ -168,10 +169,21 @@ async function runLoop(gen: number) {
           await sleep(400, gen);
         }
       }
-      if (alive() && state.playing && s.readTranslation && word.english) {
+      // the spoken meaning follows the meaning language: German definition
+      // (German voice) when set to Deutsch, English translation otherwise
+      const spokenDe = s.meaningLanguage === "de" ? word.definitionDe : undefined;
+      if (alive() && state.playing && s.readTranslation && (spokenDe || word.english)) {
         await sleep(300, gen);
         if (alive() && state.playing) {
-          await speak(word.english.split(";")[0], { lang: "en-US", rate: s.rate });
+          if (spokenDe) {
+            await speak(spokenDe, {
+              lang: "de-DE",
+              rate: s.rate,
+              voiceURI: s.germanVoice || undefined,
+            });
+          } else {
+            await speak(word.english!.split(";")[0], { lang: "en-US", rate: s.rate });
+          }
         }
       }
       if (!alive() || !state.playing) continue;
