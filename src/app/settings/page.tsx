@@ -23,7 +23,7 @@ import {
   wordsToJSON,
   type ImportResult,
 } from "@/lib/words";
-import { scheduleDefinitionBackfill } from "@/lib/definitions";
+import { restartDefinitionBackfill } from "@/lib/definitions";
 import { clearDiagLog, getDiagLog } from "@/lib/diag";
 import { Button, Card, Collapsible, Segmented, Switch, cn } from "@/components/ui";
 import { AccountCard } from "@/components/account-card";
@@ -252,8 +252,9 @@ export default function SettingsPage() {
             value={settings.meaningLanguage}
             onChange={(v) => {
               updateSettings({ meaningLanguage: v });
-              // fill missing German definitions right away on switch
-              if (v === "de") scheduleDefinitionBackfill();
+              // fill missing German definitions right away on switch, even
+              // if an earlier failed pass left a backoff behind
+              if (v === "de") restartDefinitionBackfill();
             }}
             format={(v) => (v === "en" ? "English" : "Deutsch")}
           />

@@ -59,6 +59,19 @@ export function scheduleDefinitionBackfill() {
   }, START_DELAY_MS);
 }
 
+/**
+ * The user deliberately switched the meaning language to Deutsch: forget any
+ * backoff and per-word attempts from earlier failed passes (e.g. one that ran
+ * signed-out or against a still-building deployment) and run again now.
+ */
+export function restartDefinitionBackfill() {
+  try {
+    localStorage.removeItem(BACKOFF_KEY);
+    localStorage.removeItem(ATTEMPTS_KEY);
+  } catch {}
+  scheduleDefinitionBackfill();
+}
+
 function needsDefinition(w: Word, attempts: Record<string, number>): boolean {
   if (w.status !== "ready" || w.definitionDe || w.id == null) return false;
   // sentence entries from scans don't get dictionary-style definitions
