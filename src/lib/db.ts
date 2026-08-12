@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from "dexie";
+import Dexie, { type EntityTable, type Transaction } from "dexie";
 import type { Word, Group, DictEntry, OutboxEntry } from "./types";
 
 const db = new Dexie("vokabi") as Dexie & {
@@ -34,15 +34,29 @@ db.version(2)
   });
 
 /**
- * While the sync engine applies remote rows it sets this flag so the hooks
- * below don't re-mark those rows as dirty (which would echo them back up).
+ * While the sync engine applies remote rows it tags its transaction so the
+ * hooks below don't re-mark those rows as dirty (which would echo them back
+ * up). This is tagged on the Dexie transaction itself (via PSD, propagated
+ * through the async call chain), not a plain module-level boolean: a global
+ * flag would stay "true" for the whole multi-await pull/merge pass and could
+ * misclassify an unrelated, concurrent user write (e.g. creating a group)
+ * that merely happens to run while a sync is in flight, stripping it of its
+ * dirty flag so the next reconcile pass deletes it as a stale row. Wrapping
+ * the work in a real `db.transaction()` additionally makes IndexedDB itself
+ * serialize genuinely concurrent writes to these tables against the sync's
+ * transaction, so they can never interleave with it in the first place.
  */
-let applyingRemote = false;
+type TaggedTransaction = Transaction & { applyingRemote?: boolean };
+
 export function withRemoteWrites<T>(fn: () => Promise<T>): Promise<T> {
-  applyingRemote = true;
-  return fn().finally(() => {
-    applyingRemote = false;
+  return db.transaction("rw", db.words, db.groups, db.outbox, async () => {
+    (Dexie.currentTransaction as TaggedTransaction).applyingRemote = true;
+    return fn();
   });
+}
+
+function isApplyingRemote(): boolean {
+  return !!(Dexie.currentTransaction as TaggedTransaction | undefined)?.applyingRemote;
 }
 
 /** Called after any local (user-initiated) mutation; sync.ts subscribes. */
@@ -52,20 +66,20 @@ export function onLocalMutation(cb: () => void) {
 }
 
 function touched() {
-  if (!applyingRemote) mutationListener?.();
+  mutationListener?.();
 }
 
 for (const table of [db.words, db.groups] as const) {
   table.hook("creating", (_pk, obj: Word | Group) => {
     obj.uid ??= crypto.randomUUID();
-    if (!applyingRemote) {
+    if (!isApplyingRemote()) {
       obj.dirty = 1;
       queueMicrotask(touched);
     }
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   table.hook("updating", (mods: any) => {
-    if (applyingRemote) return undefined;
+    if (isApplyingRemote()) return undefined;
     queueMicrotask(touched);
     return { ...mods, dirty: 1, updatedAt: Date.now() };
   });
