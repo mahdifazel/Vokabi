@@ -2,7 +2,7 @@
 
 ## Current state — honest assessment
 
-⚠️ **There is no automated test suite.** No test runner, no test files, no CI pipeline exist in this repository. This is flagged as the project's biggest technical-debt item.
+⚠️ **There is no unit test suite yet** (no Vitest/Jest, no CI pipeline) — still the project's biggest technical-debt item. One Playwright E2E smoke test exists, covering a single critical-path flow; it is not a substitute for unit coverage of the pure logic modules (dictionary parser, verb/noun/adjective engines) described below.
 
 What *is* enforced today:
 
@@ -10,8 +10,16 @@ What *is* enforced today:
 |---|---|---|
 | Lint | `npm run lint` | React-hooks correctness (strict: setState-in-effect, ref-in-render are errors), unused code, Next.js pitfalls |
 | Types + build | `npm run build` | Full TypeScript strict-mode check across the app and API routes; broken imports; invalid route signatures |
+| E2E smoke | `npm run test:e2e` | `e2e/create-group-add-words.spec.ts` — create a group, add a word, confirm it renders. Runs against `next dev` on port 3100 with Supabase env vars forced empty (see below), so it never touches auth/cloud |
 
-Both must pass cleanly before every push to `main` (which deploys to production — see `docs/DEPLOYMENT.md`).
+Lint and build must pass cleanly before every push to `main` (which deploys to production — see `docs/DEPLOYMENT.md`). The E2E test is not yet part of that required gate (no CI wired up) — run it manually when touching the group/add-words flow.
+
+### E2E setup notes (`playwright.config.ts`)
+
+- Runs against `next dev`, not `next start` — the service worker only registers when `NODE_ENV === "production"` (`app-shell.tsx`), so `next dev` avoids SW/cache interference in tests.
+- The `webServer` block force-overrides `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` to empty strings, regardless of what's in `.env.local`. This keeps the login gate off (`cloudConfigured()` in `lib/supabase.ts` returns false) so E2E covers the local-only, IndexedDB-backed flows without needing a test Supabase project. Sync/auth/multi-device flows are explicitly out of scope for this test and would need a dedicated test Supabase project to cover properly.
+- Each Playwright test gets a fresh browser context (fresh IndexedDB per test) — no manual state cleanup needed between tests.
+- Uses the `Pixel 7` device profile (mobile viewport + touch), matching the app's mobile-first design.
 
 ## Manual verification checklist
 
@@ -74,7 +82,7 @@ If/when tests are added, the natural fit for this codebase:
    - `lib/words.ts` — `parseCSV`, `wordsToCSV` round-trip
    - Dexie-dependent code can run against `fake-indexeddb`
 2. **Component/integration tests** — React Testing Library for the add-words flow and settings toggles
-3. **E2E (Playwright)** — login gate, add-word happy path, group playback start/stop; run against a preview deployment with a dedicated test Supabase project
-4. **CI** — GitHub Actions running `lint` + `build` (+ tests when they exist) on PRs, so `main` stops depending on contributors remembering to run them locally
+3. **More E2E (Playwright)** — the create-group/add-word smoke test exists (see above); extend with delete-word/delete-group and group playback start/stop. Sync/login-gate flows need a dedicated test Supabase project and a preview deployment, a materially bigger step — not yet done
+4. **CI** — GitHub Actions running `lint` + `build` + `test:e2e` on PRs, so `main` stops depending on contributors remembering to run them locally
 
 Coverage philosophy when adopted: prioritize the sync engine and dictionary parser (highest complexity, highest breakage cost), not UI snapshot coverage.
