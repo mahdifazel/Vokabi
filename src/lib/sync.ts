@@ -153,6 +153,12 @@ export async function syncNow(): Promise<void> {
     if (groupsRes.error) throw new Error(groupsRes.error.message);
     if (wordsRes.error) throw new Error(wordsRes.error.message);
 
+    // sanity check before trusting the pull to mean "this is everything":
+    // captured before the transaction so a concurrent local write can't
+    // shrink these counts and mask a genuinely bad pull
+    const priorSyncedWordCount = await db.words.where("dirty").equals(0).count();
+    const priorSyncedGroupCount = await db.groups.where("dirty").equals(0).count();
+
     const groupIdByUid = new Map<string, number>();
     await withRemoteWrites(async () => {
       // groups first so word group references resolve
@@ -214,15 +220,34 @@ export async function syncNow(): Promise<void> {
         }
       }
 
-      // 5. reconcile: remove local synced rows deleted on another device
+      // 5. reconcile: remove local synced rows deleted on another device.
+      // Guard against a pull that came back empty for a reason other than
+      // "everything was actually deleted" (a transient auth/network hiccup,
+      // a momentary RLS mismatch, a degraded-but-200 response): an empty
+      // result set for a table that previously had synced rows is treated
+      // as an untrustworthy pull rather than proof of deletion, so it skips
+      // wiping that table this round instead of mass-deleting the library.
+      // A real deletion elsewhere still lands on the very next successful sync.
+      const wordsPullLooksSane = wordsRes.data.length > 0 || priorSyncedWordCount === 0;
+      const groupsPullLooksSane = groupsRes.data.length > 0 || priorSyncedGroupCount === 0;
+      if (!wordsPullLooksSane) {
+        console.warn("Vokabi sync: word pull came back empty, skipping stale-word cleanup");
+      }
+      if (!groupsPullLooksSane) {
+        console.warn("Vokabi sync: group pull came back empty, skipping stale-group cleanup");
+      }
       const remoteWordUids = new Set(wordsRes.data.map((r) => r.uid));
       const remoteGroupUids = new Set(groupsRes.data.map((r) => r.uid));
-      const staleWords = await db.words
-        .filter((w) => !w.dirty && !!w.uid && !remoteWordUids.has(w.uid))
-        .toArray();
-      const staleGroups = await db.groups
-        .filter((g) => !g.dirty && !!g.uid && !remoteGroupUids.has(g.uid))
-        .toArray();
+      const staleWords = wordsPullLooksSane
+        ? await db.words
+            .filter((w) => !w.dirty && !!w.uid && !remoteWordUids.has(w.uid))
+            .toArray()
+        : [];
+      const staleGroups = groupsPullLooksSane
+        ? await db.groups
+            .filter((g) => !g.dirty && !!g.uid && !remoteGroupUids.has(g.uid))
+            .toArray()
+        : [];
       if (staleWords.length > 0) await db.words.bulkDelete(staleWords.map((w) => w.id!));
       if (staleGroups.length > 0) await db.groups.bulkDelete(staleGroups.map((g) => g.id!));
     });
