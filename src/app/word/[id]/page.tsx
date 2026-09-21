@@ -206,6 +206,42 @@ export default function WordDetailPage({
         </button>
       </header>
 
+      {/* Step through the group without going back to the list */}
+      {siblings && siblings.length > 1 && position >= 0 && (
+        <Card className="mb-4 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <p className="truncate text-xs font-extrabold tracking-wide text-muted uppercase">
+              {contextGroup?.name ?? "Group"}
+            </p>
+            <p className="shrink-0 text-xs font-bold text-muted">
+              {position + 1} of {siblings.length}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              disabled={!prevWord}
+              onClick={() => goToSibling(prevWord?.id)}
+              aria-label={
+                prevWord ? `Previous word, ${prevWord.german}` : "No previous word"
+              }
+            >
+              <ChevronLeft size={18} /> Previous
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              disabled={!nextWord}
+              onClick={() => goToSibling(nextWord?.id)}
+              aria-label={nextWord ? `Next word, ${nextWord.german}` : "No next word"}
+            >
+              Next <ChevronRight size={18} />
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Word hero */}
       <div className="mb-5 text-center">
         {word.article && (
@@ -268,42 +304,6 @@ export default function WordDetailPage({
           <span className="text-xs font-bold text-muted">Practice</span>
         </div>
       </div>
-
-      {/* Step through the group without going back to the list */}
-      {siblings && siblings.length > 1 && position >= 0 && (
-        <Card className="mb-3 p-3">
-          <div className="mb-2 flex items-center justify-between gap-2 px-1">
-            <p className="truncate text-xs font-extrabold tracking-wide text-muted uppercase">
-              {contextGroup?.name ?? "Group"}
-            </p>
-            <p className="shrink-0 text-xs font-bold text-muted">
-              {position + 1} of {siblings.length}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              disabled={!prevWord}
-              onClick={() => goToSibling(prevWord?.id)}
-              aria-label={
-                prevWord ? `Previous word, ${prevWord.german}` : "No previous word"
-              }
-            >
-              <ChevronLeft size={18} /> Previous
-            </Button>
-            <Button
-              variant="secondary"
-              className="flex-1"
-              disabled={!nextWord}
-              onClick={() => goToSibling(nextWord?.id)}
-              aria-label={nextWord ? `Next word, ${nextWord.german}` : "No next word"}
-            >
-              Next <ChevronRight size={18} />
-            </Button>
-          </div>
-        </Card>
-      )}
 
       {/* Example (verbs and adjectives show it in their own sections instead) */}
       {word.pos !== "verb" && word.pos !== "adjective" && (
