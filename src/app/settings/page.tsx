@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { updateSettings, useSettings } from "@/lib/settings";
+import { DEFAULT_SETTINGS } from "@/lib/types";
 import { getGermanVoices, speak } from "@/lib/tts";
 import {
   downloadFile,
@@ -29,9 +30,20 @@ import { Button, Card, Collapsible, Segmented, Switch, cn } from "@/components/u
 import { AccountCard } from "@/components/account-card";
 import { FeedbackCard } from "@/components/feedback-card";
 
-const RATES = [0.5, 0.75, 1, 1.25, 1.5] as const;
-const PAUSES = [0, 0.5, 1, 2, 3, 5] as const;
+const RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5] as const;
+const PAUSES = [0, 0.5, 1, 2, 3, 5, 8] as const;
 const REPEATS = [1, 2, 3, 5] as const;
+
+/**
+ * Slider position for a stored value. A value that isn't one of the steps
+ * (saved by an older build, or hand-edited) falls back to the app default's
+ * position, derived rather than hardcoded so adding a step can't silently
+ * point the fallback at the wrong one.
+ */
+function sliderIndex(steps: readonly number[], value: number, fallback: number): number {
+  const at = steps.indexOf(value);
+  return at === -1 ? steps.indexOf(fallback) : at;
+}
 
 function Row({
   label,
@@ -140,7 +152,7 @@ export default function SettingsPage() {
             min={0}
             max={RATES.length - 1}
             step={1}
-            value={RATES.indexOf(settings.rate as (typeof RATES)[number]) === -1 ? 2 : RATES.indexOf(settings.rate as (typeof RATES)[number])}
+            value={sliderIndex(RATES, settings.rate, DEFAULT_SETTINGS.rate)}
             onChange={(e) => updateSettings({ rate: RATES[Number(e.target.value)] })}
             aria-label="Reading speed"
           />
@@ -163,7 +175,7 @@ export default function SettingsPage() {
             min={0}
             max={PAUSES.length - 1}
             step={1}
-            value={PAUSES.indexOf(settings.pauseSec as (typeof PAUSES)[number]) === -1 ? 3 : PAUSES.indexOf(settings.pauseSec as (typeof PAUSES)[number])}
+            value={sliderIndex(PAUSES, settings.pauseSec, DEFAULT_SETTINGS.pauseSec)}
             onChange={(e) => updateSettings({ pauseSec: PAUSES[Number(e.target.value)] })}
             aria-label="Pause between words"
           />

@@ -61,9 +61,9 @@ export interface OutboxEntry {
 
 export interface AppSettings {
   /** speech rate multiplier */
-  rate: number; // 0.5 | 0.75 | 1 | 1.25 | 1.5
+  rate: number; // 0.25 | 0.5 | 0.75 | 1 | 1.25 | 1.5
   /** pause between words in seconds */
-  pauseSec: number; // 0 | 0.5 | 1 | 2 | 3 | 5
+  pauseSec: number; // 0 | 0.5 | 1 | 2 | 3 | 5 | 8
   /** how many times each word is repeated */
   repeatCount: number; // 1 | 2 | 3 | 5
   readArticle: boolean;
