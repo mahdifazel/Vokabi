@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { updateSettings, useSettings } from "@/lib/settings";
-import { DEFAULT_SETTINGS } from "@/lib/types";
+import { DEFAULT_SETTINGS, PAUSE_STEPS, RATE_STEPS, REPEAT_STEPS } from "@/lib/types";
 import { getGermanVoices, speak } from "@/lib/tts";
 import {
   downloadFile,
@@ -29,10 +29,6 @@ import { clearDiagLog, getDiagLog } from "@/lib/diag";
 import { Button, Card, Collapsible, Segmented, Switch, cn } from "@/components/ui";
 import { AccountCard } from "@/components/account-card";
 import { FeedbackCard } from "@/components/feedback-card";
-
-const RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5] as const;
-const PAUSES = [0, 0.5, 1, 2, 3, 5, 8] as const;
-const REPEATS = [1, 2, 3, 5] as const;
 
 /**
  * Slider position for a stored value. A value that isn't one of the steps
@@ -150,14 +146,14 @@ export default function SettingsPage() {
           <input
             type="range"
             min={0}
-            max={RATES.length - 1}
+            max={RATE_STEPS.length - 1}
             step={1}
-            value={sliderIndex(RATES, settings.rate, DEFAULT_SETTINGS.rate)}
-            onChange={(e) => updateSettings({ rate: RATES[Number(e.target.value)] })}
+            value={sliderIndex(RATE_STEPS, settings.rate, DEFAULT_SETTINGS.rate)}
+            onChange={(e) => updateSettings({ rate: RATE_STEPS[Number(e.target.value)] })}
             aria-label="Reading speed"
           />
           <div className="mt-1 flex justify-between text-xs font-bold text-muted">
-            {RATES.map((r) => (
+            {RATE_STEPS.map((r) => (
               <span key={r}>{r}x</span>
             ))}
           </div>
@@ -173,14 +169,14 @@ export default function SettingsPage() {
           <input
             type="range"
             min={0}
-            max={PAUSES.length - 1}
+            max={PAUSE_STEPS.length - 1}
             step={1}
-            value={sliderIndex(PAUSES, settings.pauseSec, DEFAULT_SETTINGS.pauseSec)}
-            onChange={(e) => updateSettings({ pauseSec: PAUSES[Number(e.target.value)] })}
+            value={sliderIndex(PAUSE_STEPS, settings.pauseSec, DEFAULT_SETTINGS.pauseSec)}
+            onChange={(e) => updateSettings({ pauseSec: PAUSE_STEPS[Number(e.target.value)] })}
             aria-label="Pause between words"
           />
           <div className="mt-1 flex justify-between text-xs font-bold text-muted">
-            {PAUSES.map((p) => (
+            {PAUSE_STEPS.map((p) => (
               <span key={p}>{p}s</span>
             ))}
           </div>
@@ -189,10 +185,10 @@ export default function SettingsPage() {
         <div className="py-3">
           <p className="mb-2 font-extrabold">Repeat each word</p>
           <Segmented
-            options={REPEATS}
-            value={(REPEATS.includes(settings.repeatCount as (typeof REPEATS)[number])
+            options={REPEAT_STEPS}
+            value={(REPEAT_STEPS.includes(settings.repeatCount as (typeof REPEAT_STEPS)[number])
               ? settings.repeatCount
-              : 1) as (typeof REPEATS)[number]}
+              : 1) as (typeof REPEAT_STEPS)[number]}
             onChange={(v) => updateSettings({ repeatCount: v })}
             format={(v) => `${v}×`}
           />

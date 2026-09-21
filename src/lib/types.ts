@@ -61,9 +61,9 @@ export interface OutboxEntry {
 
 export interface AppSettings {
   /** speech rate multiplier */
-  rate: number; // 0.25 | 0.5 | 0.75 | 1 | 1.25 | 1.5
+  rate: number; // one of RATE_STEPS
   /** pause between words in seconds */
-  pauseSec: number; // 0 | 0.5 | 1 | 2 | 3 | 5 | 8
+  pauseSec: number; // one of PAUSE_STEPS
   /** how many times each word is repeated */
   repeatCount: number; // 1 | 2 | 3 | 5
   readArticle: boolean;
@@ -76,6 +76,17 @@ export interface AppSettings {
   /** language of the displayed meaning: English translation or German definition */
   meaningLanguage: "en" | "de";
 }
+
+/**
+ * The positions each audio slider offers. They live here rather than in the
+ * settings page because `settings.ts` has to snap stored values onto them:
+ * a value saved under an older build (or a step later removed) would
+ * otherwise survive untouched and the UI would disagree with what playback
+ * actually does - the badge reading "0s" while the slider sits at "2s".
+ */
+export const RATE_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5] as const;
+export const PAUSE_STEPS = [1, 2, 3, 5, 8] as const;
+export const REPEAT_STEPS = [1, 2, 3, 5] as const;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   rate: 1,

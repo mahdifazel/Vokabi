@@ -1,12 +1,42 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { DEFAULT_SETTINGS, type AppSettings } from "./types";
+import {
+  DEFAULT_SETTINGS,
+  PAUSE_STEPS,
+  RATE_STEPS,
+  REPEAT_STEPS,
+  type AppSettings,
+} from "./types";
 
 const STORAGE_KEY = "vokabi.settings";
 
 let cached: AppSettings | null = null;
 const listeners = new Set<() => void>();
+
+/** Closest allowed step to a stored number. */
+function snap(steps: readonly number[], value: unknown, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return steps.reduce((best, step) =>
+    Math.abs(step - value) < Math.abs(best - value) ? step : best
+  );
+}
+
+/**
+ * A stored value can name a step that no longer exists: settings persist
+ * forever in localStorage, while the sliders' steps change with the app (0s
+ * and 0.5s pauses were dropped once the scale started at 1s). Snapping on
+ * load keeps the stored value, the slider position and what playback does
+ * from drifting apart.
+ */
+function normalize(s: AppSettings): AppSettings {
+  return {
+    ...s,
+    rate: snap(RATE_STEPS, s.rate, DEFAULT_SETTINGS.rate),
+    pauseSec: snap(PAUSE_STEPS, s.pauseSec, DEFAULT_SETTINGS.pauseSec),
+    repeatCount: snap(REPEAT_STEPS, s.repeatCount, DEFAULT_SETTINGS.repeatCount),
+  };
+}
 
 function load(): AppSettings {
   if (cached) return cached;
@@ -14,7 +44,7 @@ function load(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     cached = raw
-      ? { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<AppSettings>) }
+      ? normalize({ ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<AppSettings>) })
       : DEFAULT_SETTINGS;
   } catch {
     cached = DEFAULT_SETTINGS;
