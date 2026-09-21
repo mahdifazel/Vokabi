@@ -82,6 +82,7 @@ export default function WordDetailPage({
       ? siblings[position + 1]
       : undefined;
   const contextGroup = groups.find((g) => g.id === contextGroupId);
+  const hasSiblings = !!siblings && siblings.length > 1 && position >= 0;
 
   function goToSibling(id: number | undefined) {
     if (id == null) return;
@@ -206,42 +207,6 @@ export default function WordDetailPage({
         </button>
       </header>
 
-      {/* Step through the group without going back to the list */}
-      {siblings && siblings.length > 1 && position >= 0 && (
-        <Card className="mb-4 p-3">
-          <div className="mb-2 flex items-center justify-between gap-2 px-1">
-            <p className="truncate text-xs font-extrabold tracking-wide text-muted uppercase">
-              {contextGroup?.name ?? "Group"}
-            </p>
-            <p className="shrink-0 text-xs font-bold text-muted">
-              {position + 1} of {siblings.length}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              disabled={!prevWord}
-              onClick={() => goToSibling(prevWord?.id)}
-              aria-label={
-                prevWord ? `Previous word, ${prevWord.german}` : "No previous word"
-              }
-            >
-              <ChevronLeft size={18} /> Previous
-            </Button>
-            <Button
-              variant="secondary"
-              className="flex-1"
-              disabled={!nextWord}
-              onClick={() => goToSibling(nextWord?.id)}
-              aria-label={nextWord ? `Next word, ${nextWord.german}` : "No next word"}
-            >
-              Next <ChevronRight size={18} />
-            </Button>
-          </div>
-        </Card>
-      )}
-
       {/* Word hero */}
       <div className="mb-5 text-center">
         {word.article && (
@@ -271,8 +236,28 @@ export default function WordDetailPage({
         )}
       </div>
 
-      {/* Actions */}
-      <div className="mb-5 flex justify-center gap-3">
+      {/* Actions, with the group navigation flanking them. The two nav
+          circles are smaller and neutral so the word's own actions stay the
+          loudest thing in the row; a fixed-height wrapper keeps every label
+          on the same line despite the size difference. */}
+      <div className={cn("flex items-start justify-center gap-2", hasSiblings ? "mb-2" : "mb-5")}>
+        {hasSiblings && (
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex h-16 items-center">
+              <button
+                onClick={() => goToSibling(prevWord?.id)}
+                disabled={!prevWord}
+                aria-label={
+                  prevWord ? `Previous word, ${prevWord.german}` : "No previous word"
+                }
+                className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-surface-2 text-foreground shadow-sm active:scale-90 disabled:pointer-events-none disabled:opacity-40"
+              >
+                <ChevronLeft size={22} />
+              </button>
+            </div>
+            <span className="text-xs font-bold text-muted">Prev</span>
+          </div>
+        )}
         <div className="flex flex-col items-center gap-1">
           <button
             onClick={() => void playWordOnce(word)}
@@ -303,7 +288,29 @@ export default function WordDetailPage({
           </button>
           <span className="text-xs font-bold text-muted">Practice</span>
         </div>
+        {hasSiblings && (
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex h-16 items-center">
+              <button
+                onClick={() => goToSibling(nextWord?.id)}
+                disabled={!nextWord}
+                aria-label={nextWord ? `Next word, ${nextWord.german}` : "No next word"}
+                className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-surface-2 text-foreground shadow-sm active:scale-90 disabled:pointer-events-none disabled:opacity-40"
+              >
+                <ChevronRight size={22} />
+              </button>
+            </div>
+            <span className="text-xs font-bold text-muted">Next</span>
+          </div>
+        )}
       </div>
+
+      {/* where in the group you are, so "next" is never a mystery */}
+      {hasSiblings && (
+        <p className="mb-5 text-center text-xs font-semibold text-muted">
+          {contextGroup?.name ?? "Group"} · {position + 1} of {siblings!.length}
+        </p>
+      )}
 
       {/* Example (verbs and adjectives show it in their own sections instead) */}
       {word.pos !== "verb" && word.pos !== "adjective" && (

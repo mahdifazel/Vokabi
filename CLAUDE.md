@@ -74,7 +74,7 @@ src/
     favorites/             Favorites list
     learn/                 Learn hub, flashcards/, quiz/
     word/[id]/             Word detail (edit incl. group membership, practice, delete; verb sections for
-                           verbs; previous/next steps through the group named by the `?group=` query
+                           verbs; Prev/Next circles in the action row step through the group named by the `?group=` query
                            param, falling back to the word's first group when opened without one)
     login/                 Standalone auth screen (no shell chrome)
     settings/              Audio/meaning language/theme/data/account/feedback

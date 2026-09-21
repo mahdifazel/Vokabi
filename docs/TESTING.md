@@ -11,7 +11,7 @@ What *is* enforced today:
 | Lint | `npm run lint` | React-hooks correctness (strict: setState-in-effect, ref-in-render are errors), unused code, Next.js pitfalls |
 | Types + build | `npm run build` | Full TypeScript strict-mode check across the app and API routes; broken imports; invalid route signatures |
 | E2E smoke | `npm run test:e2e` | `e2e/create-group-add-words.spec.ts` — create a group, add a word, confirm it renders. Runs against `next dev` on port 3100 with Supabase env vars forced empty (see below), so it never touches auth/cloud |
-| E2E word navigation | `npm run test:e2e -- --project=local-only` | `e2e/word-detail-navigation.spec.ts` — previous/next on the word detail page walks the group in the same order the group list shows, stops at both ends, hides itself for a group of one, and doesn't bury the list in history |
+| E2E word navigation | `npm run test:e2e -- --project=local-only` | `e2e/word-detail-navigation.spec.ts` — Prev/Next in the word detail action row walk the group in the same order the group list shows, disable at both ends, disappear for a group of one, and don't bury the list in history |
 | E2E cloud sync | `npm run test:e2e -- --project=cloud-sync` | `e2e/sync-truncation.cloud.spec.ts` — the sync engine against a scripted Supabase stub: a library larger than the backend's row cap, a word added past that cap, a pull that comes back empty, and a mass deletion elsewhere. Regression cover for words silently disappearing |
 
 Lint and build must pass cleanly before every push to `main` (which deploys to production — see `docs/DEPLOYMENT.md`). The E2E test is not yet part of that required gate (no CI wired up) — run it manually when touching the group/add-words flow.

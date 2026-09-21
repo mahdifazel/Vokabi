@@ -49,25 +49,24 @@ test("previous and next step through the group from the word detail page", async
   const nav = page.getByRole("button", { name: /^(Next word|No next word)/ });
   const back = page.getByRole("button", { name: /^(Previous word|No previous word)/ });
 
-  await expect(page.getByText("1 of 3")).toBeVisible();
-  await expect(page.getByText("Kapitel 1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Kapitel 1 · 1 of 3")).toBeVisible();
   // nothing before the first word
   await expect(back).toBeDisabled();
 
   await nav.click();
   await expect(page.getByRole("heading", { name: order[1] })).toBeVisible();
-  await expect(page.getByText("2 of 3")).toBeVisible();
+  await expect(page.getByText("Kapitel 1 · 2 of 3")).toBeVisible();
   await expect(back).toBeEnabled();
 
   await nav.click();
   await expect(page.getByRole("heading", { name: order[2] })).toBeVisible();
-  await expect(page.getByText("3 of 3")).toBeVisible();
+  await expect(page.getByText("Kapitel 1 · 3 of 3")).toBeVisible();
   // nothing after the last word
   await expect(nav).toBeDisabled();
 
   await back.click();
   await expect(page.getByRole("heading", { name: order[1] })).toBeVisible();
-  await expect(page.getByText("2 of 3")).toBeVisible();
+  await expect(page.getByText("Kapitel 1 · 2 of 3")).toBeVisible();
 
   // stepping through words must not bury the group list in history
   await page.goBack();
