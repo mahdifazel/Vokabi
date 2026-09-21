@@ -84,7 +84,7 @@ export interface AppSettings {
  * otherwise survive untouched and the UI would disagree with what playback
  * actually does - the badge reading "0s" while the slider sits at "2s".
  */
-export const RATE_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5] as const;
+export const RATE_STEPS = [0.25, 0.5, 0.75, 1, 1.25] as const;
 export const PAUSE_STEPS = [1, 2, 3, 5, 8] as const;
 export const REPEAT_STEPS = [1, 2, 3, 5] as const;
 
