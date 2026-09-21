@@ -2,7 +2,7 @@
 
 ## Current state — honest assessment
 
-⚠️ **There is no unit test suite yet** (no Vitest/Jest, no CI pipeline) — still the project's biggest technical-debt item. One Playwright E2E smoke test exists, covering a single critical-path flow; it is not a substitute for unit coverage of the pure logic modules (dictionary parser, verb/noun/adjective engines) described below.
+⚠️ **There is no unit test suite yet** (no Vitest/Jest, no CI pipeline) — still the project's biggest technical-debt item. Two Playwright E2E specs exist: a local-only smoke test of one critical-path flow, and a cloud-sync suite that drives the real sync engine against a scripted backend. Neither is a substitute for unit coverage of the pure logic modules (dictionary parser, verb/noun/adjective engines) described below.
 
 What *is* enforced today:
 
@@ -11,13 +11,17 @@ What *is* enforced today:
 | Lint | `npm run lint` | React-hooks correctness (strict: setState-in-effect, ref-in-render are errors), unused code, Next.js pitfalls |
 | Types + build | `npm run build` | Full TypeScript strict-mode check across the app and API routes; broken imports; invalid route signatures |
 | E2E smoke | `npm run test:e2e` | `e2e/create-group-add-words.spec.ts` — create a group, add a word, confirm it renders. Runs against `next dev` on port 3100 with Supabase env vars forced empty (see below), so it never touches auth/cloud |
+| E2E cloud sync | `npm run test:e2e -- --project=cloud-sync` | `e2e/sync-truncation.cloud.spec.ts` — the sync engine against a scripted Supabase stub: a library larger than the backend's row cap, a word added past that cap, a pull that comes back empty, and a mass deletion elsewhere. Regression cover for words silently disappearing |
 
 Lint and build must pass cleanly before every push to `main` (which deploys to production — see `docs/DEPLOYMENT.md`). The E2E test is not yet part of that required gate (no CI wired up) — run it manually when touching the group/add-words flow.
 
 ### E2E setup notes (`playwright.config.ts`)
 
 - Runs against `next dev`, not `next start` — the service worker only registers when `NODE_ENV === "production"` (`app-shell.tsx`), so `next dev` avoids SW/cache interference in tests.
-- The `webServer` block force-overrides `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` to empty strings, regardless of what's in `.env.local`. This keeps the login gate off (`cloudConfigured()` in `lib/supabase.ts` returns false) so E2E covers the local-only, IndexedDB-backed flows without needing a test Supabase project. Sync/auth/multi-device flows are explicitly out of scope for this test and would need a dedicated test Supabase project to cover properly.
+- Two servers run side by side, one per project. The **local-only** server (port 3100) force-overrides `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` to empty strings regardless of `.env.local`, keeping the login gate off (`cloudConfigured()` returns false) so those specs cover the IndexedDB-backed flows with no auth/cloud involved. The **cloud-sync** server (port 3101) points at a stub Supabase origin instead. Two servers are needed because `NEXT_PUBLIC_*` values are baked in at build time and can't be switched per test.
+- Next takes an exclusive lock on its dist directory, so the cloud-sync server runs with `NEXT_DIST_DIR=.next-e2e-cloud` (wired through `next.config.ts`). Unset everywhere else, so normal dev and the Vercel build stay on `.next`.
+- **`e2e/supabase-stub.ts`** intercepts every request to that stub origin and answers from an in-memory table, speaking the slice of PostgREST the sync engine uses (select with `order`/`limit`/`uid=gt.`, upsert on the uid primary key, delete with `uid=in.(…)`). It also seeds a session in the exact shape supabase-js persists, so the app comes up signed in without a network round trip. The point of owning the server is being able to make it *misbehave*: `stub.maxRows` reproduces PostgREST's silent response cap, which is what made large libraries lose their newest words, and tests can delete rows behind the app's back to simulate another device. `stub.requests` records what the app sent, for asserting on paging and batching.
+- Specs ending in `.cloud.spec.ts` run in the `cloud-sync` project; everything else runs local-only.
 - Each Playwright test gets a fresh browser context (fresh IndexedDB per test) — no manual state cleanup needed between tests.
 - Uses the `Pixel 7` device profile (mobile viewport + touch), matching the app's mobile-first design.
 

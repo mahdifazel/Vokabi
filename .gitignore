@@ -18,6 +18,7 @@
 
 # next.js
 /.next/
+/.next-e2e-cloud/
 /out/
 
 # OCR runtime assets, copied from node_modules on postinstall

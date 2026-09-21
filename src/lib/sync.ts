@@ -14,7 +14,8 @@ import {
 } from "./words";
 import { scheduleExampleBackfill } from "./examples";
 import { scheduleDefinitionBackfill } from "./definitions";
-import type { Article, PartOfSpeech, Word, WordStatus } from "./types";
+import { diag } from "./diag";
+import type { Article, Group, PartOfSpeech, Word, WordStatus } from "./types";
 
 export interface SyncState {
   status: "idle" | "syncing" | "error";
@@ -133,6 +134,138 @@ async function pullTable<T extends { uid: string }>(
   return { rows, complete: false };
 }
 
+/**
+ * PostgREST puts filter values in the query string, and the request starts
+ * failing with a 400 somewhere above ~24 KB of URL - about 650 uids. Writes go
+ * out in chunks for the same reason: one oversized request used to fail the
+ * whole sync, and because its tombstones stayed in the outbox it failed again
+ * on every retry, leaving sync permanently broken with nothing reaching the
+ * cloud any more.
+ */
+const DELETE_CHUNK = 100;
+const UPSERT_CHUNK = 200;
+
+function chunked<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Reconcile safety
+// ---------------------------------------------------------------------------
+
+/**
+ * Reconcile is the one place the engine deletes data nobody asked it to
+ * delete: it infers "this row was deleted on another device" from the row
+ * being absent from a pull. Every way a pull can be wrong produces that exact
+ * same absence - truncated at a backend row cap, cut short by a network blip,
+ * served while another tab was still writing, served under a momentarily wrong
+ * session - and the inference destroys local data either way. So absence is
+ * never sufficient on its own; see `reconcilable()` for the conditions that
+ * have to hold, and note that reconcile deletes *locally only* (it never
+ * writes a tombstone), so anything it removes by mistake is still in the cloud
+ * and comes back once pulls are trustworthy again.
+ */
+const PURGE_KEY = "vokabi.pendingPurge";
+/** below this many rows a deletion is too small to be worth a second opinion */
+const PURGE_MIN_ROWS = 25;
+/** ...and it also has to be this large a share of the table to count as a purge */
+const PURGE_FRACTION = 0.25;
+/** a purge has to still be there this much later, so one bad moment can't confirm itself */
+const PURGE_CONFIRM_MS = 30_000;
+
+type PurgeRecord = Record<string, { sig: string; at: number } | undefined>;
+
+function readPurgeRecord(): PurgeRecord {
+  try {
+    return (JSON.parse(localStorage.getItem(PURGE_KEY) ?? "{}") as PurgeRecord) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function writePurgeRecord(record: PurgeRecord) {
+  try {
+    localStorage.setItem(PURGE_KEY, JSON.stringify(record));
+  } catch {
+    // storage unavailable; the guard degrades to "confirm every time"
+  }
+}
+
+/** order-independent fingerprint; only has to answer "the same set again?" */
+function purgeSignature(uids: string[]): string {
+  let h = 0x811c9dc5;
+  for (const uid of [...uids].sort()) {
+    for (let i = 0; i < uid.length; i++) {
+      h ^= uid.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+  }
+  return `${uids.length}:${(h >>> 0).toString(36)}`;
+}
+
+/**
+ * A reconcile about to remove a large share of a table is what every incident
+ * so far has looked like from the inside, and the cause is never visible from
+ * here. Make such a deletion prove itself: the identical set has to come back
+ * from a second pull at least PURGE_CONFIRM_MS later. A real mass deletion
+ * elsewhere is stable and simply lands one sync later, while a truncated,
+ * stale or partial pull essentially never reproduces the same set twice over.
+ */
+function purgeConfirmed(table: string, uids: string[], tableSize: number): boolean {
+  const record = readPurgeRecord();
+  const isPurge = uids.length >= PURGE_MIN_ROWS && uids.length >= tableSize * PURGE_FRACTION;
+  if (!isPurge) {
+    if (record[table]) {
+      delete record[table];
+      writePurgeRecord(record);
+    }
+    return true;
+  }
+  const sig = purgeSignature(uids);
+  const seen = record[table];
+  if (seen?.sig === sig && Date.now() - seen.at >= PURGE_CONFIRM_MS) {
+    delete record[table];
+    writePurgeRecord(record);
+    diag(`sync: confirmed removal of ${uids.length} ${table} deleted elsewhere`);
+    return true;
+  }
+  if (seen?.sig !== sig) record[table] = { sig, at: Date.now() };
+  writePurgeRecord(record);
+  diag(`sync: holding back removal of ${uids.length}/${tableSize} ${table}, awaiting a second pull`);
+  return false;
+}
+
+/**
+ * Whether this pull may be used to delete local rows at all. Both conditions
+ * are about the pull itself rather than the rows:
+ *
+ * - `complete`: pullTable paged to an empty page instead of stopping at a
+ *   backend row cap. Without this, every row past the cap reads as deleted and
+ *   the library gets truncated to exactly the cap on every single sync.
+ * - non-empty, unless the table was empty here beforehand: an empty result is
+ *   far more often a hiccup (auth/session, network, a momentary RLS mismatch)
+ *   than a genuine "the user deleted everything".
+ */
+function reconcilable(
+  table: string,
+  pull: { rows: unknown[]; complete: boolean },
+  syncedBefore: number
+): boolean {
+  if (!pull.complete) {
+    diag(`sync: ${table} pull incomplete, skipping cleanup`);
+    console.warn(`Vokabi sync: ${table} pull incomplete, skipping stale-row cleanup`);
+    return false;
+  }
+  if (pull.rows.length === 0 && syncedBefore > 0) {
+    diag(`sync: ${table} pull empty but ${syncedBefore} synced locally, skipping cleanup`);
+    console.warn(`Vokabi sync: ${table} pull came back empty, skipping stale-row cleanup`);
+    return false;
+  }
+  return true;
+}
+
 let syncing = false;
 let rerun = false;
 
@@ -150,12 +283,13 @@ export async function syncNow(): Promise<void> {
   try {
     await handleAccountSwitch(user.id);
 
-    // 1. push deletions
+    // 1. push deletions, in chunks (see DELETE_CHUNK: one request carrying
+    // every uid overflows the query string and 400s, which used to brick sync)
     const tombstones = await db.outbox.toArray();
     for (const table of ["words", "groups"] as const) {
       const uids = tombstones.filter((t) => t.table === table).map((t) => t.uid);
-      if (uids.length > 0) {
-        const { error } = await supabase.from(table).delete().in("uid", uids);
+      for (const batch of chunked(uids, DELETE_CHUNK)) {
+        const { error } = await supabase.from(table).delete().in("uid", batch);
         if (error) throw new Error(error.message);
       }
     }
@@ -166,9 +300,9 @@ export async function syncNow(): Promise<void> {
 
     // 2. push dirty groups
     const dirtyGroups = await db.groups.where("dirty").equals(1).toArray();
-    if (dirtyGroups.length > 0) {
+    for (const batch of chunked(dirtyGroups, UPSERT_CHUNK)) {
       const { error } = await supabase.from("groups").upsert(
-        dirtyGroups.map((g) => ({
+        batch.map((g) => ({
           uid: g.uid,
           user_id: user.id,
           name: g.name,
@@ -180,16 +314,15 @@ export async function syncNow(): Promise<void> {
       // clear `dirty` only on rows that still look exactly like what was
       // pushed: a rename that landed while the upsert was in flight is not in
       // the cloud, and marking it clean would both drop it from the next push
-      // and let the older remote copy overwrite it in the merge below
-      const pushedGroupAt = new Map(
-        dirtyGroups.map((g) => [g.id!, g.updatedAt ?? g.createdAt] as const)
-      );
+      // and let the older remote copy overwrite it in the merge below.
+      // Per chunk, so a later chunk failing can't un-record what already went up
+      const pushedAt = new Map(batch.map((g) => [g.id!, g.updatedAt ?? g.createdAt] as const));
       await withRemoteWrites(() =>
         db.groups
           .where("id")
-          .anyOf([...pushedGroupAt.keys()])
+          .anyOf([...pushedAt.keys()])
           .modify((g) => {
-            if ((g.updatedAt ?? g.createdAt) === pushedGroupAt.get(g.id!)) g.dirty = 0;
+            if ((g.updatedAt ?? g.createdAt) === pushedAt.get(g.id!)) g.dirty = 0;
           })
       );
     }
@@ -200,9 +333,9 @@ export async function syncNow(): Promise<void> {
       if (g.id != null && g.uid) groupUidById.set(g.id, g.uid);
     });
     const dirtyWords = await db.words.where("dirty").equals(1).toArray();
-    if (dirtyWords.length > 0) {
+    for (const batch of chunked(dirtyWords, UPSERT_CHUNK)) {
       const { error } = await supabase.from("words").upsert(
-        dirtyWords.map((w) => ({
+        batch.map((w) => ({
           uid: w.uid,
           user_id: user.id,
           german: w.german,
@@ -228,16 +361,30 @@ export async function syncNow(): Promise<void> {
       // same as for groups: enrichment and the example/definition backfills
       // write to these rows while the upsert is in flight, so only the rows
       // that are unchanged since the snapshot count as pushed
-      const pushedWordAt = new Map(dirtyWords.map((w) => [w.id!, w.updatedAt] as const));
+      const pushedAt = new Map(batch.map((w) => [w.id!, w.updatedAt] as const));
       await withRemoteWrites(() =>
         db.words
           .where("id")
-          .anyOf([...pushedWordAt.keys()])
+          .anyOf([...pushedAt.keys()])
           .modify((w) => {
-            if (w.updatedAt === pushedWordAt.get(w.id!)) w.dirty = 0;
+            if (w.updatedAt === pushedAt.get(w.id!)) w.dirty = 0;
           })
       );
     }
+
+    // Which rows this device already considered synced, captured *before* the
+    // pull goes out. Only these may be judged by what the pull contains: a row
+    // another tab pushed while our request was in flight is clean and does
+    // exist remotely, yet is missing from the snapshot of the server we are
+    // about to receive, and deleting it would be pure race.
+    const syncedWordUids = new Set<string>();
+    await db.words.each((w) => {
+      if (!w.dirty && w.uid) syncedWordUids.add(w.uid);
+    });
+    const syncedGroupUids = new Set<string>();
+    await db.groups.each((g) => {
+      if (!g.dirty && g.uid) syncedGroupUids.add(g.uid);
+    });
 
     // 4. pull all remote rows (paged, see pullTable: a single select is
     // silently truncated at the backend's max-rows)
@@ -245,12 +392,6 @@ export async function syncNow(): Promise<void> {
       pullTable<RemoteGroupRow>(supabase, "groups"),
       pullTable<RemoteWordRow>(supabase, "words"),
     ]);
-
-    // sanity check before trusting the pull to mean "this is everything":
-    // captured before the transaction so a concurrent local write can't
-    // shrink these counts and mask a genuinely bad pull
-    const priorSyncedWordCount = await db.words.where("dirty").equals(0).count();
-    const priorSyncedGroupCount = await db.groups.where("dirty").equals(0).count();
 
     const groupIdByUid = new Map<string, number>();
     await withRemoteWrites(async () => {
@@ -280,7 +421,9 @@ export async function syncNow(): Promise<void> {
       }
 
       for (const r of wordsPull.rows) {
-        const groupIds = ((r.group_uids ?? []) as string[])
+        const local = await db.words.where("uid").equals(r.uid).first();
+        const remoteGroups = (r.group_uids ?? []) as string[];
+        const groupIds = remoteGroups
           .map((u) => groupIdByUid.get(u))
           .filter((id): id is number => id != null);
         const fields: Partial<Word> = {
@@ -300,7 +443,14 @@ export async function syncNow(): Promise<void> {
           updatedAt: r.updated_at,
           dirty: 0,
         };
-        const local = await db.words.where("uid").equals(r.uid).first();
+        // The word claims groups, but none of them resolved to a local row -
+        // the group is missing from this pull rather than gone. Writing the
+        // empty list would strip the word of its membership and
+        // ensureWordsGrouped() would then re-home it to "General", quietly
+        // moving it out of its group. Keep what the device already has.
+        if (remoteGroups.length > 0 && groupIds.length === 0 && local?.groupIds.length) {
+          delete fields.groupIds;
+        }
         if (!local) {
           await db.words.add({
             uid: r.uid,
@@ -313,42 +463,49 @@ export async function syncNow(): Promise<void> {
         }
       }
 
-      // 5. reconcile: remove local synced rows deleted on another device.
-      // Deleting on the strength of "this uid wasn't in the pull" is only
-      // valid when the pull is provably the complete set, so two guards have
-      // to hold. `complete` means pullTable paged all the way to an empty
-      // page rather than stopping at a backend row cap - without it, every
-      // row past the cap reads as deleted and the library gets truncated to
-      // exactly that many words. The emptiness check then covers a pull that
-      // came back empty for a reason other than "everything was actually
-      // deleted" (a transient auth/network hiccup, a momentary RLS mismatch,
-      // a degraded-but-200 response). Either guard failing skips the cleanup
-      // for that table this round; a real deletion elsewhere still lands on
-      // the very next sane sync.
-      const wordsPullLooksSane =
-        wordsPull.complete && (wordsPull.rows.length > 0 || priorSyncedWordCount === 0);
-      const groupsPullLooksSane =
-        groupsPull.complete && (groupsPull.rows.length > 0 || priorSyncedGroupCount === 0);
-      if (!wordsPullLooksSane) {
-        console.warn("Vokabi sync: word pull incomplete, skipping stale-word cleanup");
-      }
-      if (!groupsPullLooksSane) {
-        console.warn("Vokabi sync: group pull incomplete, skipping stale-group cleanup");
-      }
+      // 5. reconcile: remove local rows that were deleted on another device.
+      // See the "Reconcile safety" block above for why absence from a pull is
+      // never on its own enough to delete on. A row has to clear all of:
+      //   - the pull it is judged against is trustworthy (`reconcilable`)
+      //   - it is not dirty, i.e. it holds nothing this device hasn't pushed
+      //   - this device already had it synced *before* that pull went out,
+      //     so it isn't something another tab uploaded mid-request
+      //   - and, if the result is a mass deletion, a second pull agrees
       const remoteWordUids = new Set(wordsPull.rows.map((r) => r.uid));
       const remoteGroupUids = new Set(groupsPull.rows.map((r) => r.uid));
-      const staleWords = wordsPullLooksSane
-        ? await db.words
-            .filter((w) => !w.dirty && !!w.uid && !remoteWordUids.has(w.uid))
-            .toArray()
-        : [];
-      const staleGroups = groupsPullLooksSane
-        ? await db.groups
-            .filter((g) => !g.dirty && !!g.uid && !remoteGroupUids.has(g.uid))
-            .toArray()
-        : [];
-      if (staleWords.length > 0) await db.words.bulkDelete(staleWords.map((w) => w.id!));
-      if (staleGroups.length > 0) await db.groups.bulkDelete(staleGroups.map((g) => g.id!));
+
+      let staleWords: Word[] = [];
+      if (reconcilable("words", wordsPull, syncedWordUids.size)) {
+        staleWords = await db.words
+          .filter(
+            (w) => !w.dirty && !!w.uid && syncedWordUids.has(w.uid) && !remoteWordUids.has(w.uid)
+          )
+          .toArray();
+        if (!purgeConfirmed("words", staleWords.map((w) => w.uid!), syncedWordUids.size)) {
+          staleWords = [];
+        }
+      }
+
+      let staleGroups: Group[] = [];
+      if (reconcilable("groups", groupsPull, syncedGroupUids.size)) {
+        staleGroups = await db.groups
+          .filter(
+            (g) => !g.dirty && !!g.uid && syncedGroupUids.has(g.uid) && !remoteGroupUids.has(g.uid)
+          )
+          .toArray();
+        if (!purgeConfirmed("groups", staleGroups.map((g) => g.uid!), syncedGroupUids.size)) {
+          staleGroups = [];
+        }
+      }
+
+      if (staleWords.length > 0) {
+        diag(`sync: removing ${staleWords.length} words deleted elsewhere`);
+        await db.words.bulkDelete(staleWords.map((w) => w.id!));
+      }
+      if (staleGroups.length > 0) {
+        diag(`sync: removing ${staleGroups.length} groups deleted elsewhere`);
+        await db.groups.bulkDelete(staleGroups.map((g) => g.id!));
+      }
     });
 
     // brand-new account with no groups anywhere → seed the default group

@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // the E2E cloud-sync server's separate dist dir (see next.config.ts)
+    ".next-e2e-cloud/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

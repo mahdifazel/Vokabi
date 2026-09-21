@@ -204,27 +204,46 @@ export async function ensureDefaultGroup() {
 }
 
 /**
- * Self-healing: the library page only shows group cards, so a word without a
- * group is invisible. Words can end up ungrouped (a deleted group, or a sync
- * pull whose group references didn't resolve); re-home them to "General"
- * (or the first group). Runs at startup, after sync pulls and after group
- * deletion. The updates mark the rows dirty, so the repair syncs back.
+ * Self-healing: the library page only shows group cards, so a word that no
+ * group card can reach is invisible there. Two ways that happens, and both
+ * have to be repaired:
+ *
+ * - the word has no groups at all (its group was deleted, or a sync pull's
+ *   group references didn't resolve)
+ * - the word points at a group id that no longer exists on this device. Its
+ *   `groupIds` is non-empty, so an emptiness check walks straight past it,
+ *   yet no group card and no group page lists it - the word is just as gone
+ *   from the UI while sitting untouched in the database. Local group ids are
+ *   per-device numbers, so a group removed by a reconcile, or one that came
+ *   back from the cloud under a fresh id, leaves exactly these dangling
+ *   references behind on any word that wasn't remapped with it.
+ *
+ * Dangling ids are dropped, and a word left with nothing is re-homed to
+ * "General" (or the first group). Runs at startup, after sync pulls and after
+ * group deletion. The updates mark the rows dirty, so the repair syncs back.
  */
 export async function ensureWordsGrouped() {
-  const orphans = await db.words.filter((w) => !w.groupIds || w.groupIds.length === 0).toArray();
-  if (orphans.length === 0) {
-    await ensureDefaultGroup();
-    return;
-  }
   await ensureDefaultGroup();
   const groups = await db.groups.toArray();
+  const live = new Set(groups.map((g) => g.id).filter((id): id is number => id != null));
+  const broken = await db.words
+    .filter((w) => {
+      const ids = w.groupIds ?? [];
+      return ids.length === 0 || ids.some((id) => !live.has(id));
+    })
+    .toArray();
+  if (broken.length === 0) return;
   const target =
     groups.find((g) => g.name.trim().toLowerCase() === "general") ??
     [...groups].sort((a, b) => a.name.localeCompare(b.name))[0];
   if (target?.id == null) return;
   const now = Date.now();
-  for (const w of orphans) {
-    await db.words.update(w.id!, { groupIds: [target.id], updatedAt: now });
+  for (const w of broken) {
+    const kept = (w.groupIds ?? []).filter((id) => live.has(id));
+    await db.words.update(w.id!, {
+      groupIds: kept.length > 0 ? kept : [target.id],
+      updatedAt: now,
+    });
   }
   scheduleSync();
 }
