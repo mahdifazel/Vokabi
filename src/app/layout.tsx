@@ -1,19 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Baloo_2, Nunito } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 
-const nunito = Nunito({
+// Self-hosted rather than next/font/google: that fetches the files during
+// `next build`, so a bad moment at Google's end fails the build and takes the
+// deploy with it. See src/app/fonts/README.md for what these files are and
+// how to regenerate them. One variable file per family covers every weight.
+const nunito = localFont({
+  src: "./fonts/Nunito-Variable.woff2",
   variable: "--font-nunito",
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: "200 1000",
+  display: "swap",
 });
 
 // display face for titles and the wordmark; body text stays Nunito
-const baloo = Baloo_2({
+const baloo = localFont({
+  src: "./fonts/Baloo2-Variable.woff2",
   variable: "--font-baloo",
-  subsets: ["latin", "latin-ext"],
-  weight: ["600", "700", "800"],
+  weight: "400 800",
+  display: "swap",
 });
 
 export const metadata: Metadata = {

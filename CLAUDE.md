@@ -19,7 +19,7 @@ Guidance for AI assistants and new developers working in this repository.
 | Local DB | Dexie 4 (IndexedDB) + dexie-react-hooks (`useLiveQuery`) | Source of truth on-device |
 | Cloud | Supabase (`@supabase/supabase-js` v2) | Auth (email/password + Google OAuth) + Postgres with row-level security |
 | Speech | Web Speech API | `speechSynthesis` for TTS, `webkitSpeechRecognition` for practice scoring |
-| Fonts | Nunito (body) + Baloo 2 (display) via `next/font/google` | CSS vars `--font-nunito`, `--font-baloo`; `h1`/`h2` use the display face (rule in `globals.css`) |
+| Fonts | Nunito (body) + Baloo 2 (display), **self-hosted** via `next/font/local` | Variable woff2 in `src/app/fonts/` (see its README). CSS vars `--font-nunito`, `--font-baloo`; `h1`/`h2` use the display face (rule in `globals.css`) |
 | Hosting | Vercel | Auto-deploys from `main`; custom domain vokabi.app |
 
 ## Key commands
@@ -143,7 +143,7 @@ docs/                       Architecture, decisions, deployment, testing
 - **ESLint is strict about React**: no synchronous `setState` in effect bodies (use timers/microtasks or restructure), no ref reads during render. `npm run lint` must be clean before committing.
 - **Copy style**: user-facing text is friendly, concise, sentence case ("Add your first words", "Got it").
 - **Word data**: `favorite` is `0 | 1` (Dexie can't index booleans). `groupIds` is a multiEntry index. German nouns are auto-capitalized in `buildWord`. `splitWordList` separates pasted entries on newlines, semicolons, `/`, and a dash with spaces on both sides; commas never split (plural notes like "die Katze, -n" stay one entry).
-- After changing cached assets or fixing SW behavior, **bump `CACHE` in `public/sw.js`** (currently `vokabi-v13`) or clients keep the old version.
+- After changing cached assets or fixing SW behavior, **bump `CACHE` in `public/sw.js`** (currently `vokabi-v14`) or clients keep the old version.
 
 ## Gotchas
 
@@ -155,6 +155,7 @@ docs/                       Architecture, decisions, deployment, testing
 - Every word must belong to a group: the Library page only shows group cards, so ungrouped words are invisible there. `ensureWordsGrouped()` (in `words.ts`) self-heals by re-homing orphans to "General"; it runs at startup, after sync pulls, and after group deletion. It also repairs words pointing at a group id that no longer exists: `groupIds` is non-empty so an emptiness check misses them, yet no group card and no group page lists them, so they are just as invisible while sitting untouched in the database. Local group ids are per-device numbers, so a group removed by a reconcile or one that returned from the cloud under a fresh id leaves exactly these dangling references behind. Don't create code paths that leave words ungrouped. Deleting a group offers two options: keep its words (re-homed) or delete them too — but words that also belong to other groups are never deleted, only detached.
 - The manifest `background_color` must match the dark theme background (`#0c0f1a`): Android's generated PWA launch screen uses it, and the in-app splash draws on that color, so they blend into one splash.
 - Playback diagnostics UI is intentionally hidden: 7 taps on the Settings footer reveal it. The logging itself always runs.
+- Fonts are **self-hosted** (`next/font/local`, files in `src/app/fonts/`). `next/font/google` downloads the files during `next build`, so an unreachable Google fails the build outright with a `module-not-found` on `[next]/internal/font/google/…module.css`. That killed two deploys here, one on production, where a failed build means `main` looks merged while the old bundle keeps serving. Don't move these back to `next/font/google`; regenerate the subsets per `src/app/fonts/README.md` instead.
 - Supabase dashboard settings that matter and live outside the repo: Site URL (`https://vokabi.app`), redirect URLs, "Confirm email" disabled (built-in mailer has a very low hourly limit), and the Google OAuth provider (client ID/secret from a Google Cloud OAuth client; without it "Continue with Google" shows a provider-not-enabled error).
 - A stored session can be valid client-side but rejected server-side (rotated Supabase keys → "Invalid session"). Server 401s must clear the local session before redirecting to `/login`, or the login page bounces back (it redirects to `/` whenever a client-side user exists); the admin layout does this.
 - `withRemoteWrites()` (`db.ts`) tags the sync engine's writes on the actual Dexie transaction (`Dexie.currentTransaction`), not a plain module-level boolean, and runs inside a real `db.transaction()`. A global flag previously stayed "true" for the whole multi-await sync pull, so an unrelated concurrent local write (e.g. creating a group and adding words right after) could get misclassified as remote, lose its `dirty` flag, and get deleted by the same pass's stale-row reconcile as an "orphan" — the visible symptoms were a group's name reverting to the `"…"` fallback (the row was gone) and newly added words/groups vanishing. Don't reintroduce a plain global flag here.
