@@ -1,10 +1,12 @@
 "use client";
 
 import { use, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Heart,
   Mic,
   Pencil,
@@ -13,7 +15,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { ARTICLE_BG, type Article, type PartOfSpeech } from "@/lib/types";
+import { ARTICLE_BG, type Article, type PartOfSpeech, type Word } from "@/lib/types";
 import { deleteWord, ensureWordsGrouped, toggleFavorite, wordMeaning } from "@/lib/words";
 import { playWordOnce, wordSpokenText } from "@/lib/player";
 import { speak } from "@/lib/tts";
@@ -54,6 +56,41 @@ export default function WordDetailPage({
   const word = useLiveQuery(() => db.words.get(wordId), [wordId]);
   const { meaningLanguage } = useSettings();
   const groups = useLiveQuery(() => db.groups.orderBy("name").toArray(), []) ?? [];
+
+  // Which group the previous/next buttons walk through. Word rows carry the
+  // group they were listed under in the URL; opening a word from somewhere
+  // without that context (All words, favorites, search, a shared link) falls
+  // back to its first group, and the card names the group either way so it is
+  // never a mystery what "next" means.
+  const searchParams = useSearchParams();
+  const groupParam = Number(searchParams.get("group"));
+  const contextGroupId =
+    Number.isInteger(groupParam) && groupParam > 0 ? groupParam : word?.groupIds[0];
+  // same query and order as the group page, so the sequence matches the list
+  // the user was just looking at
+  const siblings = useLiveQuery(
+    () =>
+      contextGroupId == null
+        ? Promise.resolve([] as Word[])
+        : db.words.where("groupIds").equals(contextGroupId).sortBy("createdAt"),
+    [contextGroupId]
+  );
+  const position = siblings?.findIndex((w) => w.id === wordId) ?? -1;
+  const prevWord = position > 0 ? siblings?.[position - 1] : undefined;
+  const nextWord =
+    siblings && position >= 0 && position < siblings.length - 1
+      ? siblings[position + 1]
+      : undefined;
+  const contextGroup = groups.find((g) => g.id === contextGroupId);
+
+  function goToSibling(id: number | undefined) {
+    if (id == null) return;
+    // replace, not push: stepping through ten words shouldn't bury the list
+    // ten entries deep in history, and Previous already walks back
+    router.replace(
+      contextGroupId != null ? `/word/${id}?group=${contextGroupId}` : `/word/${id}`
+    );
+  }
 
   const [practiceOpen, setPracticeOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -231,6 +268,42 @@ export default function WordDetailPage({
           <span className="text-xs font-bold text-muted">Practice</span>
         </div>
       </div>
+
+      {/* Step through the group without going back to the list */}
+      {siblings && siblings.length > 1 && position >= 0 && (
+        <Card className="mb-3 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <p className="truncate text-xs font-extrabold tracking-wide text-muted uppercase">
+              {contextGroup?.name ?? "Group"}
+            </p>
+            <p className="shrink-0 text-xs font-bold text-muted">
+              {position + 1} of {siblings.length}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              disabled={!prevWord}
+              onClick={() => goToSibling(prevWord?.id)}
+              aria-label={
+                prevWord ? `Previous word, ${prevWord.german}` : "No previous word"
+              }
+            >
+              <ChevronLeft size={18} /> Previous
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              disabled={!nextWord}
+              onClick={() => goToSibling(nextWord?.id)}
+              aria-label={nextWord ? `Next word, ${nextWord.german}` : "No next word"}
+            >
+              Next <ChevronRight size={18} />
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Example (verbs and adjectives show it in their own sections instead) */}
       {word.pos !== "verb" && word.pos !== "adjective" && (

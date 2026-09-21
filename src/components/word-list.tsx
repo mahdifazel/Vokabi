@@ -117,6 +117,7 @@ export function WordList({
             index={i}
             selectionMode={selecting}
             selected={w.id != null && selected.has(w.id)}
+            groupId={fromGroupId}
             onLongPress={() => w.id != null && enter(w.id)}
             onToggleSelect={() => w.id != null && toggle(w.id)}
           />

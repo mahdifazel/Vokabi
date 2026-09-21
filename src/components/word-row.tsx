@@ -17,6 +17,7 @@ export function WordRow({
   index = 0,
   selectionMode = false,
   selected = false,
+  groupId,
   onLongPress,
   onToggleSelect,
 }: {
@@ -25,6 +26,9 @@ export function WordRow({
   index?: number;
   selectionMode?: boolean;
   selected?: boolean;
+  /** the group this row is being listed under, so the detail page can offer
+   *  previous/next through the same group the user was just looking at */
+  groupId?: number;
   onLongPress?: () => void;
   onToggleSelect?: () => void;
 }) {
@@ -67,7 +71,9 @@ export function WordRow({
       )}
       <button
         className="min-w-0 flex-1 cursor-pointer text-left"
-        onClick={() => router.push(`/word/${word.id}`)}
+        onClick={() =>
+          router.push(groupId != null ? `/word/${word.id}?group=${groupId}` : `/word/${word.id}`)
+        }
         tabIndex={selectionMode ? -1 : undefined}
         aria-label={`Open details for ${word.german}`}
       >
