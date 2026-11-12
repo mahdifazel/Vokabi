@@ -166,7 +166,8 @@ async function runLoop(gen: number) {
         if (!alive() || !state.playing) break;
         await speak(text, { lang: "de-DE", rate: s.rate, voiceURI: s.germanVoice || undefined });
         if (alive() && state.playing && r < s.repeatCount - 1) {
-          await sleep(400, gen);
+          // read fresh so a change made mid-word applies to the next gap
+          await sleep(getSettings().repeatPauseSec * 1000, gen);
         }
       }
       // the spoken meaning follows the meaning language: German definition

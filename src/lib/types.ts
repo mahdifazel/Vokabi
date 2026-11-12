@@ -66,6 +66,8 @@ export interface AppSettings {
   pauseSec: number; // one of PAUSE_STEPS
   /** how many times each word is repeated */
   repeatCount: number; // 1 | 2 | 3 | 5
+  /** pause between the repetitions of one word, in seconds */
+  repeatPauseSec: number; // one of REPEAT_PAUSE_STEPS
   readArticle: boolean;
   readTranslation: boolean;
   autoRepeat: boolean;
@@ -87,11 +89,13 @@ export interface AppSettings {
 export const RATE_STEPS = [0.25, 0.5, 0.75, 1, 1.25] as const;
 export const PAUSE_STEPS = [1, 2, 3, 5, 8] as const;
 export const REPEAT_STEPS = [1, 2, 3, 5] as const;
+export const REPEAT_PAUSE_STEPS = [1, 2, 3, 5, 10] as const;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   rate: 1,
   pauseSec: 2,
   repeatCount: 1,
+  repeatPauseSec: 1,
   readArticle: true,
   readTranslation: false,
   autoRepeat: false,

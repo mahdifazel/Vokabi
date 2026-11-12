@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   PAUSE_STEPS,
   RATE_STEPS,
+  REPEAT_PAUSE_STEPS,
   REPEAT_STEPS,
   type AppSettings,
 } from "./types";
@@ -35,6 +36,11 @@ function normalize(s: AppSettings): AppSettings {
     rate: snap(RATE_STEPS, s.rate, DEFAULT_SETTINGS.rate),
     pauseSec: snap(PAUSE_STEPS, s.pauseSec, DEFAULT_SETTINGS.pauseSec),
     repeatCount: snap(REPEAT_STEPS, s.repeatCount, DEFAULT_SETTINGS.repeatCount),
+    repeatPauseSec: snap(
+      REPEAT_PAUSE_STEPS,
+      s.repeatPauseSec,
+      DEFAULT_SETTINGS.repeatPauseSec
+    ),
   };
 }
 

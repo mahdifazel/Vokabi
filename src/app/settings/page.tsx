@@ -13,7 +13,13 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { updateSettings, useSettings } from "@/lib/settings";
-import { DEFAULT_SETTINGS, PAUSE_STEPS, RATE_STEPS, REPEAT_STEPS } from "@/lib/types";
+import {
+  DEFAULT_SETTINGS,
+  PAUSE_STEPS,
+  RATE_STEPS,
+  REPEAT_PAUSE_STEPS,
+  REPEAT_STEPS,
+} from "@/lib/types";
 import { getGermanVoices, speak } from "@/lib/tts";
 import {
   downloadFile,
@@ -193,6 +199,42 @@ export default function SettingsPage() {
             format={(v) => `${v}×`}
           />
         </div>
+
+        {settings.repeatCount > 1 && (
+          <div className="py-3">
+            <div className="mb-2 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-extrabold">Pause between repeats</p>
+                <p className="text-sm font-semibold text-muted">
+                  How long to wait before saying it again
+                </p>
+              </div>
+              <span className="shrink-0 rounded-lg bg-primary-soft px-2 py-0.5 text-sm font-extrabold text-primary">
+                {settings.repeatPauseSec}s
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={REPEAT_PAUSE_STEPS.length - 1}
+              step={1}
+              value={sliderIndex(
+                REPEAT_PAUSE_STEPS,
+                settings.repeatPauseSec,
+                DEFAULT_SETTINGS.repeatPauseSec
+              )}
+              onChange={(e) =>
+                updateSettings({ repeatPauseSec: REPEAT_PAUSE_STEPS[Number(e.target.value)] })
+              }
+              aria-label="Pause between repeats"
+            />
+            <div className="mt-1 flex justify-between text-xs font-bold text-muted">
+              {REPEAT_PAUSE_STEPS.map((p) => (
+                <span key={p}>{p}s</span>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Row label="Read article" hint="“das Haus” instead of “Haus”">
           <Switch
