@@ -88,6 +88,14 @@ export interface SpeakOptions {
   voiceURI?: string;
 }
 
+/**
+ * What the app calls "1x". The engine's own rate 1 is the voice's native,
+ * conversational pace, which sounds rushed to a learner, so every requested
+ * rate (the Reading speed steps, the slow replay, the voice preview) is scaled
+ * by this one factor. The slider stays relative: 0.5x is still half of 1x.
+ */
+const BASE_RATE = 0.8;
+
 const HARD_TIMEOUT_MS = 20000;
 const ABSOLUTE_TIMEOUT_MS = 120000;
 
@@ -155,7 +163,7 @@ function speakAttempt(text: string, opts: SpeakOptions): Promise<string> {
   return new Promise((resolve) => {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = opts.lang ?? "de-DE";
-    u.rate = opts.rate ?? 1;
+    u.rate = (opts.rate ?? 1) * BASE_RATE;
     const voice = pickVoice(u.lang, opts.voiceURI);
     if (voice) u.voice = voice;
 
