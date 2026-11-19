@@ -43,8 +43,8 @@ export function VerbDetails({ word }: { word: Word }) {
       <ExampleCard
         example={example}
         exampleEn={exampleEn}
-        // the Persian translation belongs to the word's own example only
-        exampleFa={word.example ? word.exampleFa : undefined}
+        // translated from whichever example is shown here (see lib/persian.ts)
+        exampleFa={word.exampleFa}
       />
 
       {/* Past forms (Präteritum + Perfekt) */}

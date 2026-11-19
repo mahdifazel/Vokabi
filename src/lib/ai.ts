@@ -57,6 +57,47 @@ export async function extractWordsWithAi(rawText: string): Promise<AiWordsResult
   }
 }
 
+/**
+ * Result of a batched backfill request. "rate-limited" = providers busy, try
+ * again in a minute; "unavailable" = AI can't be used at all right now
+ * (signed out, local-only, AI not configured); null = a transient failure
+ * (timeout, network, both providers failing once) worth retrying soon.
+ */
+export type AiBatchResult<T> = T[] | "rate-limited" | "unavailable" | null;
+
+async function postBatch<T>(
+  path: string,
+  words: unknown[],
+  field: string,
+  valid: (item: unknown) => item is T
+): Promise<AiBatchResult<T>> {
+  try {
+    const token = await getSessionToken();
+    if (!token) return "unavailable";
+    const res = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ words }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (res.status === 429) return "rate-limited";
+    // 401 = session rejected, 501/503 = AI not configured on this deployment
+    if (res.status === 401 || res.status === 501 || res.status === 503) return "unavailable";
+    if (!res.ok) return null;
+    const json = (await res.json()) as Record<string, unknown>;
+    const list = json[field];
+    return (Array.isArray(list) ? list : []).filter(valid);
+  } catch {
+    return null;
+  }
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+const nonEmpty = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
+
 /** How many words each /api/ai/examples request may carry (server cap). */
 export const AI_EXAMPLE_BATCH = 10;
 
@@ -73,37 +114,12 @@ export interface AiExample {
   exampleEn: string;
 }
 
-export type AiExamplesResult = AiExample[] | "rate-limited" | null;
-
 /** Generate simple example sentences for words that have none. */
-export async function generateExamplesWithAi(words: AiExampleWord[]): Promise<AiExamplesResult> {
-  try {
-    const token = await getSessionToken();
-    if (!token) return null;
-    const res = await fetch("/api/ai/examples", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ words }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (res.status === 429) return "rate-limited";
-    if (!res.ok) return null;
-
-    const json = (await res.json()) as { examples?: unknown };
-    return (Array.isArray(json.examples) ? json.examples : []).filter(
-      (e): e is AiExample =>
-        typeof e === "object" && e !== null &&
-        typeof (e as AiExample).german === "string" &&
-        typeof (e as AiExample).example === "string" &&
-        (e as AiExample).example.trim().length > 0 &&
-        typeof (e as AiExample).exampleEn === "string"
-    );
-  } catch {
-    return null;
-  }
+export function generateExamplesWithAi(words: AiExampleWord[]): Promise<AiBatchResult<AiExample>> {
+  return postBatch("/api/ai/examples", words, "examples", (e): e is AiExample =>
+    isObj(e) && typeof e.german === "string" && nonEmpty(e.example) &&
+    typeof e.exampleEn === "string"
+  );
 }
 
 /** How many words each /api/ai/definitions request may carry (server cap). */
@@ -114,38 +130,13 @@ export interface AiDefinition {
   definitionDe: string;
 }
 
-export type AiDefinitionsResult = AiDefinition[] | "rate-limited" | null;
-
 /** Generate short German definitions for words that have none. */
-export async function generateDefinitionsWithAi(
+export function generateDefinitionsWithAi(
   words: AiExampleWord[]
-): Promise<AiDefinitionsResult> {
-  try {
-    const token = await getSessionToken();
-    if (!token) return null;
-    const res = await fetch("/api/ai/definitions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ words }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (res.status === 429) return "rate-limited";
-    if (!res.ok) return null;
-
-    const json = (await res.json()) as { definitions?: unknown };
-    return (Array.isArray(json.definitions) ? json.definitions : []).filter(
-      (d): d is AiDefinition =>
-        typeof d === "object" && d !== null &&
-        typeof (d as AiDefinition).german === "string" &&
-        typeof (d as AiDefinition).definitionDe === "string" &&
-        (d as AiDefinition).definitionDe.trim().length > 0
-    );
-  } catch {
-    return null;
-  }
+): Promise<AiBatchResult<AiDefinition>> {
+  return postBatch("/api/ai/definitions", words, "definitions", (d): d is AiDefinition =>
+    isObj(d) && typeof d.german === "string" && nonEmpty(d.definitionDe)
+  );
 }
 
 /** How many words each /api/ai/persian request may carry (server cap). */
@@ -161,38 +152,13 @@ export interface AiPersianTranslation {
   exampleFa?: string;
 }
 
-export type AiPersianResult = AiPersianTranslation[] | "rate-limited" | null;
-
 /** Translate words (and their example sentences) into Persian. */
-export async function generatePersianWithAi(
+export function generatePersianWithAi(
   words: AiPersianWord[]
-): Promise<AiPersianResult> {
-  try {
-    const token = await getSessionToken();
-    if (!token) return null;
-    const res = await fetch("/api/ai/persian", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ words }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (res.status === 429) return "rate-limited";
-    if (!res.ok) return null;
-
-    const json = (await res.json()) as { translations?: unknown };
-    return (Array.isArray(json.translations) ? json.translations : []).filter(
-      (t): t is AiPersianTranslation =>
-        typeof t === "object" && t !== null &&
-        typeof (t as AiPersianTranslation).german === "string" &&
-        typeof (t as AiPersianTranslation).translationFa === "string" &&
-        (t as AiPersianTranslation).translationFa.trim().length > 0
-    );
-  } catch {
-    return null;
-  }
+): Promise<AiBatchResult<AiPersianTranslation>> {
+  return postBatch("/api/ai/persian", words, "translations", (t): t is AiPersianTranslation =>
+    isObj(t) && typeof t.german === "string" && nonEmpty(t.translationFa)
+  );
 }
 
 /** Pull the vocabulary straight out of a scanned photo via a vision model. */
