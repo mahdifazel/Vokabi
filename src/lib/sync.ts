@@ -16,7 +16,7 @@ import { scheduleExampleBackfill } from "./examples";
 import { scheduleDefinitionBackfill } from "./definitions";
 import { schedulePersianBackfill } from "./persian";
 import { diag } from "./diag";
-import type { Article, Group, PartOfSpeech, Word, WordStatus } from "./types";
+import type { Article, Group, OutboxEntry, PartOfSpeech, Word, WordStatus } from "./types";
 
 export interface SyncState {
   status: "idle" | "syncing" | "error";
@@ -531,6 +531,11 @@ export async function syncNow(): Promise<void> {
       }
     });
 
+    // this account's own unsynced changes from before another account used
+    // the device: put them back on top of the fresh pull (they get pushed
+    // on the next sync)
+    await restoreParked(user.id);
+
     // brand-new account with no groups anywhere → seed the default group
     // (after the pull, so an existing "General" from another device wins),
     // and re-home any words whose groups didn't survive the merge so they
@@ -578,20 +583,119 @@ export async function syncNow(): Promise<void> {
 }
 
 /**
+ * Unsynced changes of an account that signed out of this device, parked until
+ * that account signs back in. Words carry their group *uids*, not local ids:
+ * local group ids are per-device numbers that don't survive the switch.
+ */
+const PARKED_PREFIX = "vokabi.parked.";
+
+type ParkedWord = Omit<Word, "id" | "groupIds"> & { groupUids: string[] };
+interface Parked {
+  words: ParkedWord[];
+  groups: Omit<Group, "id">[];
+  outbox: Omit<OutboxEntry, "id">[];
+}
+
+function withoutId<T extends { id?: number }>(row: T): Omit<T, "id"> {
+  const copy = { ...row };
+  delete copy.id;
+  return copy;
+}
+
+function readParked(userId: string): Parked | null {
+  try {
+    return JSON.parse(localStorage.getItem(PARKED_PREFIX + userId) ?? "null") as Parked | null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * When a different account logs in on this device, clear the previous
- * account's local data (it lives safely in their cloud). Data added while
- * logged out is dirty and therefore kept + uploaded to the new account.
+ * account's local data (it lives safely in their cloud).
+ *
+ * Its unsynced rows (dirty words/groups, queued deletions) are parked under
+ * that account instead of being kept in the live tables. Keeping them used
+ * to corrupt libraries: the dirty words stayed while the groups they point
+ * at were deleted with the rest, so ensureWordsGrouped() re-homed them into
+ * "General" and the next sync made that permanent in the cloud. On
+ * 2026-11-19 this moved 92 words of one account out of their groups, after
+ * a Persian backfill had left them dirty while pushes were failing.
  */
 async function handleAccountSwitch(userId: string) {
   const last = localStorage.getItem(LAST_USER_KEY);
   if (!last || last === userId) return;
+
+  const groups = await db.groups.toArray();
+  const uidById = new Map(groups.map((g) => [g.id!, g.uid!] as const));
+  const dirtyWords = await db.words.filter((w) => !!w.dirty).toArray();
+  const dirtyGroups = groups.filter((g) => !!g.dirty);
+  const outbox = await db.outbox.toArray();
+  if (dirtyWords.length + dirtyGroups.length + outbox.length > 0) {
+    const earlier = readParked(last) ?? { words: [], groups: [], outbox: [] };
+    const parked: Parked = {
+      words: [
+        ...earlier.words,
+        ...dirtyWords.map((w) => {
+          const copy: Partial<Word> = { ...w };
+          delete copy.id;
+          delete copy.groupIds;
+          return {
+            ...(copy as ParkedWord),
+            groupUids: w.groupIds.map((i) => uidById.get(i)).filter((u): u is string => !!u),
+          };
+        }),
+      ],
+      groups: [...earlier.groups, ...dirtyGroups.map(withoutId)],
+      outbox: [...earlier.outbox, ...outbox.map(withoutId)],
+    };
+    // throws when storage is full: then the switch (and this sync) fails
+    // rather than dropping or corrupting the previous account's changes
+    localStorage.setItem(PARKED_PREFIX + last, JSON.stringify(parked));
+    diag(
+      `sync: account switch, parked ${dirtyWords.length} words, ${dirtyGroups.length} groups, ${outbox.length} deletions of the previous account`
+    );
+  }
+
   await withRemoteWrites(async () => {
-    const syncedWords = await db.words.filter((w) => !w.dirty).toArray();
-    const syncedGroups = await db.groups.filter((g) => !g.dirty).toArray();
-    await db.words.bulkDelete(syncedWords.map((w) => w.id!));
-    await db.groups.bulkDelete(syncedGroups.map((g) => g.id!));
+    await db.words.clear();
+    await db.groups.clear();
     await db.outbox.clear();
   });
   localStorage.removeItem(LAST_SYNC_KEY);
   localStorage.setItem(LAST_USER_KEY, userId);
+}
+
+/** Re-apply an account's parked unsynced rows after a pull (see handleAccountSwitch). */
+async function restoreParked(userId: string) {
+  const parked = readParked(userId);
+  if (!parked) return;
+  for (const g of parked.groups) {
+    const local = g.uid ? await db.groups.where("uid").equals(g.uid).first() : undefined;
+    if (local) await db.groups.update(local.id!, { name: g.name });
+    else await db.groups.add({ ...g });
+  }
+  const idByUid = new Map<string, number>();
+  await db.groups.each((g) => {
+    if (g.uid && g.id != null) idByUid.set(g.uid, g.id);
+  });
+  for (const { groupUids, ...w } of parked.words) {
+    const groupIds = groupUids
+      .map((u) => idByUid.get(u))
+      .filter((id): id is number => id != null);
+    const local = w.uid ? await db.words.where("uid").equals(w.uid).first() : undefined;
+    if (local) {
+      // a group missing from the pull keeps the membership the pull gave it
+      await db.words.update(local.id!, {
+        ...w,
+        groupIds: groupIds.length > 0 ? groupIds : local.groupIds,
+      });
+    } else {
+      await db.words.add({ ...w, groupIds } as Word);
+    }
+  }
+  for (const o of parked.outbox) await db.outbox.add({ ...o });
+  localStorage.removeItem(PARKED_PREFIX + userId);
+  diag(`sync: restored ${parked.words.length} parked words, ${parked.groups.length} groups`);
+  scheduleSync();
 }
