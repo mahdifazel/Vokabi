@@ -40,7 +40,12 @@ export function VerbDetails({ word }: { word: Word }) {
   return (
     <>
       {/* Example sentence */}
-      <ExampleCard example={example} exampleEn={exampleEn} />
+      <ExampleCard
+        example={example}
+        exampleEn={exampleEn}
+        // the Persian translation belongs to the word's own example only
+        exampleFa={word.example ? word.exampleFa : undefined}
+      />
 
       {/* Past forms (Präteritum + Perfekt) */}
       <Card className="mb-3 p-4">

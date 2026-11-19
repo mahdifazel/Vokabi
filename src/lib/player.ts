@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import type { Word } from "./types";
 import { getSettings } from "./settings";
-import { speak, stopSpeaking } from "./tts";
+import { hasVoiceFor, speak, stopSpeaking } from "./tts";
 import { keepAliveStatus, pauseKeepAlive, startKeepAlive, stopKeepAlive } from "./keepalive";
 import { diag, hiddenFlag } from "./diag";
 
@@ -80,7 +80,12 @@ function updateMediaSession() {
     const s = getSettings();
     ms.metadata = new MediaMetadata({
       title: word.article ? `${word.article} ${word.german}` : word.german,
-      artist: (s.meaningLanguage === "de" ? word.definitionDe || word.english : word.english) ?? "",
+      artist:
+        (s.meaningLanguage === "de"
+          ? word.definitionDe || word.english
+          : s.meaningLanguage === "fa"
+            ? word.translationFa || word.english
+            : word.english) ?? "",
       album: `Vokabi · ${state.title}`,
       artwork: [{ src: "/icon.svg", sizes: "512x512", type: "image/svg+xml" }],
     });
@@ -171,12 +176,21 @@ async function runLoop(gen: number) {
         }
       }
       // the spoken meaning follows the meaning language: German definition
-      // (German voice) when set to Deutsch, English translation otherwise
+      // (German voice) when set to Deutsch, Persian when set to Persian and
+      // the device has a Persian voice, English translation otherwise
       const spokenDe = s.meaningLanguage === "de" ? word.definitionDe : undefined;
-      if (alive() && state.playing && s.readTranslation && (spokenDe || word.english)) {
+      const spokenFa =
+        s.meaningLanguage === "fa" && word.translationFa && hasVoiceFor("fa")
+          ? word.translationFa
+          : undefined;
+      if (
+        alive() && state.playing && s.readTranslation && (spokenDe || spokenFa || word.english)
+      ) {
         await sleep(300, gen);
         if (alive() && state.playing) {
-          if (spokenDe) {
+          if (spokenFa) {
+            await speak(spokenFa, { lang: "fa-IR", rate: s.rate });
+          } else if (spokenDe) {
             await speak(spokenDe, {
               lang: "de-DE",
               rate: s.rate,

@@ -33,6 +33,10 @@ export interface Word {
   exampleEn?: string;
   /** simple German definition, shown when the meaning language is Deutsch */
   definitionDe?: string;
+  /** Persian translation of the entry, shown when the meaning language is Persian */
+  translationFa?: string;
+  /** Persian translation of the example sentence */
+  exampleFa?: string;
   notes?: string;
   favorite: 0 | 1; // number so Dexie can index it
   groupIds: number[];
@@ -75,8 +79,8 @@ export interface AppSettings {
   theme: "system" | "light" | "dark";
   /** preferred German voice URI, empty = auto-pick best */
   germanVoice: string;
-  /** language of the displayed meaning: English translation or German definition */
-  meaningLanguage: "en" | "de";
+  /** language of the displayed meaning: English translation, German definition or Persian translation */
+  meaningLanguage: "en" | "de" | "fa";
 }
 
 /**
@@ -118,6 +122,8 @@ export interface DictEntry {
   example?: string;
   exampleEn?: string;
   definitionDe?: string;
+  translationFa?: string;
+  exampleFa?: string;
   /** true when the online lookup found nothing */
   miss?: boolean;
   fetchedAt: number;

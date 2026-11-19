@@ -47,7 +47,7 @@ export function MiniPlayer() {
                 {word.german}
               </p>
               {meaning && (
-                <p className="mt-1 break-words text-sm font-semibold text-muted">{meaning}</p>
+                <p dir="auto" className="mt-1 break-words text-sm font-semibold text-muted">{meaning}</p>
               )}
               <p className="mt-1.5 text-xs font-semibold text-muted">
                 {player.title} · {player.index + 1}/{player.words.length}

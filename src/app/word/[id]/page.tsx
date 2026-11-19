@@ -102,9 +102,11 @@ export default function WordDetailPage({
     pos: "" as PartOfSpeech | "",
     english: "",
     definitionDe: "",
+    translationFa: "",
     plural: "",
     example: "",
     exampleEn: "",
+    exampleFa: "",
     notes: "",
     groupIds: [] as number[],
   });
@@ -129,9 +131,11 @@ export default function WordDetailPage({
       pos: word.pos ?? "",
       english: word.english ?? "",
       definitionDe: word.definitionDe ?? "",
+      translationFa: word.translationFa ?? "",
       plural: word.plural ?? "",
       example: word.example ?? "",
       exampleEn: word.exampleEn ?? "",
+      exampleFa: word.exampleFa ?? "",
       notes: word.notes ?? "",
       groupIds: word.groupIds,
     });
@@ -139,16 +143,30 @@ export default function WordDetailPage({
   }
 
   async function saveEdit() {
-    if (!draft.german.trim()) return;
+    if (!draft.german.trim() || !word) return;
+    // a Persian translation left untouched while its German text changed is
+    // stale: clear it so the Persian backfill translates the new text
+    const germanChanged = draft.german.trim() !== word.german;
+    const exampleChanged = draft.example.trim() !== (word.example ?? "");
+    const translationFa =
+      germanChanged && draft.translationFa === (word.translationFa ?? "")
+        ? ""
+        : draft.translationFa.trim();
+    const exampleFa =
+      exampleChanged && draft.exampleFa === (word.exampleFa ?? "")
+        ? ""
+        : draft.exampleFa.trim();
     await db.words.update(wordId, {
       german: draft.german.trim(),
       article: draft.article || undefined,
       pos: draft.pos || undefined,
       english: draft.english.trim() || undefined,
       definitionDe: draft.definitionDe.trim() || undefined,
+      translationFa: translationFa || undefined,
       plural: draft.plural.trim() || undefined,
       example: draft.example.trim() || undefined,
       exampleEn: draft.exampleEn.trim() || undefined,
+      exampleFa: exampleFa || undefined,
       notes: draft.notes.trim() || undefined,
       groupIds: draft.groupIds,
       status: "ready",
@@ -221,7 +239,7 @@ export default function WordDetailPage({
         )}
         <h1 className="text-4xl font-black tracking-tight">{word.german}</h1>
         {word.ipa && <p className="mt-1 text-base font-semibold text-muted">{word.ipa}</p>}
-        <p className="mt-2 text-xl font-bold text-muted">
+        <p dir="auto" className="mt-2 text-xl font-bold text-muted">
           {wordMeaning(word, meaningLanguage) ?? "-"}
         </p>
         {(word.plural || word.pos) && (
@@ -314,7 +332,7 @@ export default function WordDetailPage({
 
       {/* Example (verbs and adjectives show it in their own sections instead) */}
       {word.pos !== "verb" && word.pos !== "adjective" && (
-        <ExampleCard example={word.example} exampleEn={word.exampleEn} />
+        <ExampleCard example={word.example} exampleEn={word.exampleEn} exampleFa={word.exampleFa} />
       )}
 
       {/* Notes */}
@@ -462,6 +480,17 @@ export default function WordDetailPage({
             />
           </label>
           <label className="text-sm font-extrabold">
+            Persian translation
+            <Textarea
+              className="mt-1"
+              rows={2}
+              value={draft.translationFa}
+              onChange={(e) => setDraft({ ...draft, translationFa: e.target.value })}
+              lang="fa"
+              dir="auto"
+            />
+          </label>
+          <label className="text-sm font-extrabold">
             Plural
             <Input
               className="mt-1"
@@ -487,6 +516,17 @@ export default function WordDetailPage({
               rows={2}
               value={draft.exampleEn}
               onChange={(e) => setDraft({ ...draft, exampleEn: e.target.value })}
+            />
+          </label>
+          <label className="text-sm font-extrabold">
+            Example translation (Persian)
+            <Textarea
+              className="mt-1"
+              rows={2}
+              value={draft.exampleFa}
+              onChange={(e) => setDraft({ ...draft, exampleFa: e.target.value })}
+              lang="fa"
+              dir="auto"
             />
           </label>
           <label className="text-sm font-extrabold">

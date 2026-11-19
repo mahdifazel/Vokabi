@@ -146,7 +146,7 @@ function QuizContent() {
                       )}
                       {m.word.german}
                     </span>
-                    <span className="truncate font-semibold text-muted">
+                    <span dir="auto" className="truncate font-semibold text-muted">
                       {primaryMeaning(m.word, getSettings().meaningLanguage)}
                     </span>
                   </li>
@@ -175,7 +175,7 @@ function QuizContent() {
           >
             <p className="text-center text-sm font-bold text-muted">{TYPE_LABEL[q.type]}</p>
             <div className="my-7 flex items-center justify-center gap-3 text-center">
-              <p className="text-3xl font-black tracking-tight">
+              <p dir="auto" className="text-3xl font-black tracking-tight">
                 {q.type === "article" ? (
                   <>
                     <span className="text-muted">___</span> {q.prompt}
@@ -202,10 +202,11 @@ function QuizContent() {
                 return (
                   <button
                     key={opt}
+                    dir="auto"
                     onClick={() => choose(opt)}
                     disabled={selected !== null}
                     className={cn(
-                      "min-h-13 cursor-pointer rounded-2xl border-2 px-4 py-3 text-left text-base font-bold transition-all active:scale-[0.98]",
+                      "min-h-13 cursor-pointer rounded-2xl border-2 px-4 py-3 text-start text-base font-bold transition-all active:scale-[0.98]",
                       isCorrect
                         ? "border-accent bg-accent-soft text-accent"
                         : isWrongPick

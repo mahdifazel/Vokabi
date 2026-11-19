@@ -82,6 +82,15 @@ function pickVoice(lang: string, preferredURI?: string): SpeechSynthesisVoice | 
   return match[0] ?? null;
 }
 
+/** Whether the device has an installed voice for a language ("fa", "en"…). */
+export function hasVoiceFor(lang: string): boolean {
+  if (!ttsSupported()) return false;
+  const prefix = lang.slice(0, 2).toLowerCase();
+  return window.speechSynthesis
+    .getVoices()
+    .some((v) => v.lang.toLowerCase().startsWith(prefix));
+}
+
 export interface SpeakOptions {
   lang?: string;
   rate?: number;

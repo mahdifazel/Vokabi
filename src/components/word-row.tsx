@@ -90,7 +90,7 @@ export function WordRow({
           )}
           <span className="truncate text-[16px] font-extrabold">{word.german}</span>
         </div>
-        <p className="mt-0.5 truncate text-sm font-semibold text-muted">
+        <p dir="auto" className="mt-0.5 truncate text-start text-sm font-semibold text-muted">
           {word.status === "pending" ? (
             <span className="inline-flex items-center gap-1">
               <Loader2 size={12} className="animate-spin" /> looking up…

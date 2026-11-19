@@ -2,7 +2,7 @@
 
 import { Volume2 } from "lucide-react";
 import { speak } from "@/lib/tts";
-import { getSettings } from "@/lib/settings";
+import { getSettings, useSettings } from "@/lib/settings";
 import { Card } from "./ui";
 
 function speakGerman(text: string) {
@@ -10,16 +10,34 @@ function speakGerman(text: string) {
   void speak(text, { lang: "de-DE", rate: s.rate, voiceURI: s.germanVoice || undefined });
 }
 
-/** Example sentence card (German + English + play button), shared by all word kinds */
-export function ExampleCard({ example, exampleEn }: { example?: string; exampleEn?: string }) {
-  if (!example && !exampleEn) return null;
+/**
+ * Example sentence card (German + translation + play button), shared by all
+ * word kinds. The translation is Persian when that is the meaning language
+ * and one exists, English otherwise.
+ */
+export function ExampleCard({
+  example,
+  exampleEn,
+  exampleFa,
+}: {
+  example?: string;
+  exampleEn?: string;
+  exampleFa?: string;
+}) {
+  const { meaningLanguage } = useSettings();
+  const translation = (meaningLanguage === "fa" && exampleFa) || exampleEn;
+  if (!example && !translation) return null;
   return (
     <Card className="mb-3 p-4">
       <p className="mb-1 text-xs font-extrabold tracking-wide text-muted uppercase">Example</p>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           {example && <p className="font-bold" lang="de">{example}</p>}
-          {exampleEn && <p className="mt-0.5 text-sm font-semibold text-muted">{exampleEn}</p>}
+          {translation && (
+            <p dir="auto" className="mt-0.5 text-sm font-semibold text-muted">
+              {translation}
+            </p>
+          )}
         </div>
         {example && (
           <button

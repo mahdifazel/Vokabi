@@ -62,6 +62,7 @@ export function primaryMeaning(
   lang: AppSettings["meaningLanguage"] = "en"
 ): string | undefined {
   if (lang === "de" && w.definitionDe?.trim()) return w.definitionDe.trim();
+  if (lang === "fa" && w.translationFa?.trim()) return w.translationFa.trim();
   return w.english?.split(";")[0]?.trim() || undefined;
 }
 

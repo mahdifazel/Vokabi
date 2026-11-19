@@ -189,7 +189,7 @@ function FlashcardsContent() {
                     className="absolute inset-0 flex flex-col items-center justify-center rounded-[28px] border border-primary/40 bg-primary-soft p-6 text-center shadow-lg"
                     style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
                   >
-                    <p className="text-3xl font-black tracking-tight">
+                    <p dir="auto" className="text-3xl font-black tracking-tight">
                       {wordMeaning(word, meaningLanguage) ?? "no translation"}
                     </p>
                     {word.plural && (

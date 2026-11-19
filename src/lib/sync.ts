@@ -14,6 +14,7 @@ import {
 } from "./words";
 import { scheduleExampleBackfill } from "./examples";
 import { scheduleDefinitionBackfill } from "./definitions";
+import { schedulePersianBackfill } from "./persian";
 import { diag } from "./diag";
 import type { Article, Group, PartOfSpeech, Word, WordStatus } from "./types";
 
@@ -347,6 +348,10 @@ export async function syncNow(): Promise<void> {
           example: w.example ?? null,
           example_en: w.exampleEn ?? null,
           definition_de: w.definitionDe ?? null,
+          // Persian columns only go out once a row has them, so a project
+          // whose words table predates them keeps syncing until it is migrated
+          ...(w.translationFa ? { translation_fa: w.translationFa } : {}),
+          ...(w.exampleFa ? { example_fa: w.exampleFa } : {}),
           notes: w.notes ?? null,
           favorite: !!w.favorite,
           group_uids: w.groupIds
@@ -436,6 +441,10 @@ export async function syncNow(): Promise<void> {
           example: r.example ?? undefined,
           exampleEn: r.example_en ?? undefined,
           definitionDe: r.definition_de ?? undefined,
+          // a project not yet migrated has no Persian columns: keep what
+          // this device has instead of wiping it on every pull
+          ...("translation_fa" in r ? { translationFa: (r.translation_fa as string | null) ?? undefined } : {}),
+          ...("example_fa" in r ? { exampleFa: (r.example_fa as string | null) ?? undefined } : {}),
           notes: r.notes ?? undefined,
           favorite: r.favorite ? 1 : 0,
           groupIds,
@@ -534,6 +543,7 @@ export async function syncNow(): Promise<void> {
 
     // same for German definitions when the meaning language is Deutsch
     scheduleDefinitionBackfill();
+    schedulePersianBackfill();
 
     const now = Date.now();
     localStorage.setItem(LAST_SYNC_KEY, String(now));

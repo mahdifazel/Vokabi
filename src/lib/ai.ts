@@ -148,6 +148,53 @@ export async function generateDefinitionsWithAi(
   }
 }
 
+/** How many words each /api/ai/persian request may carry (server cap). */
+export const AI_PERSIAN_BATCH = 10;
+
+export interface AiPersianWord extends AiExampleWord {
+  example?: string;
+}
+
+export interface AiPersianTranslation {
+  german: string;
+  translationFa: string;
+  exampleFa?: string;
+}
+
+export type AiPersianResult = AiPersianTranslation[] | "rate-limited" | null;
+
+/** Translate words (and their example sentences) into Persian. */
+export async function generatePersianWithAi(
+  words: AiPersianWord[]
+): Promise<AiPersianResult> {
+  try {
+    const token = await getSessionToken();
+    if (!token) return null;
+    const res = await fetch("/api/ai/persian", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ words }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (res.status === 429) return "rate-limited";
+    if (!res.ok) return null;
+
+    const json = (await res.json()) as { translations?: unknown };
+    return (Array.isArray(json.translations) ? json.translations : []).filter(
+      (t): t is AiPersianTranslation =>
+        typeof t === "object" && t !== null &&
+        typeof (t as AiPersianTranslation).german === "string" &&
+        typeof (t as AiPersianTranslation).translationFa === "string" &&
+        (t as AiPersianTranslation).translationFa.trim().length > 0
+    );
+  } catch {
+    return null;
+  }
+}
+
 /** Pull the vocabulary straight out of a scanned photo via a vision model. */
 export async function extractWordsFromImageWithAi(
   canvas: HTMLCanvasElement

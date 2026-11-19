@@ -38,7 +38,12 @@ export function AdjectiveDetails({ word }: { word: Word }) {
   return (
     <>
       {/* Example sentence */}
-      <ExampleCard example={example} exampleEn={exampleEn} />
+      <ExampleCard
+        example={example}
+        exampleEn={exampleEn}
+        // the Persian translation belongs to the word's own example only
+        exampleFa={word.example ? word.exampleFa : undefined}
+      />
 
       {/* Comparison forms (omitted for non-gradable adjectives) */}
       {rows.length > 0 && (

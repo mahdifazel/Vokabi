@@ -137,6 +137,8 @@ export function buildWord(
     example: entry?.example,
     exampleEn: entry?.exampleEn,
     definitionDe: entry?.definitionDe,
+    translationFa: entry?.translationFa,
+    exampleFa: entry?.exampleFa,
     favorite: 0,
     groupIds,
     status: entry ? "ready" : "notfound",

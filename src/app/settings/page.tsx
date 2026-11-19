@@ -31,6 +31,7 @@ import {
   type ImportResult,
 } from "@/lib/words";
 import { restartDefinitionBackfill } from "@/lib/definitions";
+import { restartPersianBackfill } from "@/lib/persian";
 import { clearDiagLog, getDiagLog } from "@/lib/diag";
 import { Button, Card, Collapsible, Segmented, Switch, cn } from "@/components/ui";
 import { AccountCard } from "@/components/account-card";
@@ -298,20 +299,23 @@ export default function SettingsPage() {
         </p>
         <div className="py-3">
           <Segmented
-            options={["en", "de"] as const}
+            options={["en", "de", "fa"] as const}
             value={settings.meaningLanguage}
             onChange={(v) => {
               updateSettings({ meaningLanguage: v });
-              // fill missing German definitions right away on switch, even
-              // if an earlier failed pass left a backoff behind
+              // fill missing definitions/translations right away on switch,
+              // even if an earlier failed pass left a backoff behind
               if (v === "de") restartDefinitionBackfill();
+              if (v === "fa") restartPersianBackfill();
             }}
-            format={(v) => (v === "en" ? "English" : "Deutsch")}
+            format={(v) => (v === "en" ? "English" : v === "de" ? "Deutsch" : "فارسی")}
           />
           <p className="mt-2 pb-1 text-sm font-semibold text-muted">
             {settings.meaningLanguage === "de"
               ? "Words show a simple German definition. Missing definitions are filled in automatically in the background."
-              : "Words show their English translation."}
+              : settings.meaningLanguage === "fa"
+                ? "Words, sentences and examples show their Persian translation. Missing translations are filled in automatically in the background."
+                : "Words show their English translation."}
           </p>
         </div>
       </Card>

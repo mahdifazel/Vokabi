@@ -5,6 +5,7 @@ import { fetchPresetGroups } from "./presets";
 import { scheduleExampleBackfill } from "./examples";
 import { scheduleSync } from "./sync";
 import { scheduleDefinitionBackfill } from "./definitions";
+import { schedulePersianBackfill } from "./persian";
 import type { AppSettings, Group, PartOfSpeech, Word } from "./types";
 
 /**
@@ -82,6 +83,7 @@ async function enrichWords(items: { input: ParsedInput; word: Word }[]) {
   scheduleExampleBackfill();
   // and a German definition when the meaning language is Deutsch
   scheduleDefinitionBackfill();
+  schedulePersianBackfill();
 }
 
 // guards against the same word being enriched twice concurrently (e.g. a
@@ -466,6 +468,7 @@ export function matchesQuery(word: Word, query: string): boolean {
     word.german.toLowerCase().includes(q) ||
     (word.english?.toLowerCase().includes(q) ?? false) ||
     (word.definitionDe?.toLowerCase().includes(q) ?? false) ||
+    (word.translationFa?.includes(q) ?? false) ||
     (word.article?.toLowerCase() === q) ||
     (word.plural?.toLowerCase().includes(q) ?? false)
   );
@@ -475,12 +478,14 @@ export function matchesQuery(word: Word, query: string): boolean {
  * The meaning to display for a word under the current meaning language.
  * Deutsch shows the German definition, falling back to the English
  * translation while the definition backfill hasn't reached the word yet.
+ * Persian works the same way with the Persian translation.
  */
 export function wordMeaning(
   word: Word,
   lang: AppSettings["meaningLanguage"]
 ): string | undefined {
   if (lang === "de") return word.definitionDe || word.english;
+  if (lang === "fa") return word.translationFa || word.english;
   return word.english;
 }
 
