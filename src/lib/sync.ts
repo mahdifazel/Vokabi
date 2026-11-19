@@ -269,6 +269,8 @@ function reconcilable(
 
 let syncing = false;
 let rerun = false;
+/** set once the words table rejected the Persian columns (not migrated yet) */
+let persianColumnsMissing = false;
 
 /** Full sync: push deletions + dirty rows, pull everything, reconcile. */
 export async function syncNow(): Promise<void> {
@@ -335,7 +337,7 @@ export async function syncNow(): Promise<void> {
     });
     const dirtyWords = await db.words.where("dirty").equals(1).toArray();
     for (const batch of chunked(dirtyWords, UPSERT_CHUNK)) {
-      const { error } = await supabase.from("words").upsert(
+      const rows = (withPersian: boolean) =>
         batch.map((w) => ({
           uid: w.uid,
           user_id: user.id,
@@ -348,10 +350,10 @@ export async function syncNow(): Promise<void> {
           example: w.example ?? null,
           example_en: w.exampleEn ?? null,
           definition_de: w.definitionDe ?? null,
-          // Persian columns only go out once a row has them, so a project
-          // whose words table predates them keeps syncing until it is migrated
-          ...(w.translationFa ? { translation_fa: w.translationFa } : {}),
-          ...(w.exampleFa ? { example_fa: w.exampleFa } : {}),
+          // Persian columns only go out once a row has them, and are left
+          // out entirely when the project hasn't been migrated yet (below)
+          ...(withPersian && w.translationFa ? { translation_fa: w.translationFa } : {}),
+          ...(withPersian && w.exampleFa ? { example_fa: w.exampleFa } : {}),
           notes: w.notes ?? null,
           favorite: !!w.favorite,
           group_uids: w.groupIds
@@ -360,8 +362,20 @@ export async function syncNow(): Promise<void> {
           status: w.status,
           created_at: w.createdAt,
           updated_at: w.updatedAt,
-        }))
-      );
+        }));
+      let { error } = await supabase
+        .from("words")
+        .upsert(rows(!persianColumnsMissing));
+      // A words table created before the Persian columns existed rejects the
+      // whole batch (PGRST204 "could not find the 'example_fa' column"),
+      // which would leave sync broken for everyone using Persian. Push the
+      // rest of the row without them instead; the translations stay on this
+      // device until supabase/schema.sql is re-run.
+      if (error && /translation_fa|example_fa/.test(error.message)) {
+        persianColumnsMissing = true;
+        diag("sync: Persian columns missing in words table, pushing without them");
+        ({ error } = await supabase.from("words").upsert(rows(false)));
+      }
       if (error) throw new Error(error.message);
       // same as for groups: enrichment and the example/definition backfills
       // write to these rows while the upsert is in flight, so only the rows
