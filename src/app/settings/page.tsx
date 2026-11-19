@@ -308,7 +308,7 @@ export default function SettingsPage() {
               if (v === "de") restartDefinitionBackfill();
               if (v === "fa") restartPersianBackfill();
             }}
-            format={(v) => (v === "en" ? "English" : v === "de" ? "Deutsch" : "فارسی")}
+            format={(v) => (v === "en" ? "English" : v === "de" ? "Deutsch" : "Persian")}
           />
           <p className="mt-2 pb-1 text-sm font-semibold text-muted">
             {settings.meaningLanguage === "de"
